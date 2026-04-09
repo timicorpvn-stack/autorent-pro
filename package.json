@@ -1,4 +1,4 @@
-```json
+json
 {
   "name": "autorent-pro",
   "private": true,
@@ -25,4 +25,3 @@
     "vite": "^6.2.0"
   }
 }
-```
