@@ -356,7 +356,7 @@ function DashTab(p){
 
 /* ══ VEHICLES ══ */
 function VehTab(p){
-  var[showAdd,setShowAdd]=useState(false);var[editing,setEditing]=useState(null);var[search,setSearch]=useState("");var[fSt,setFSt]=useState("all");
+  var[showAdd,setShowAdd]=useState(false);var[editing,setEditing]=useState(null);var[search,setSearch]=useState("");var[fSt,setFSt]=useState("all");var[selV,setSelV]=useState(null);
   var ef={name:"",plate:"",odo:"0",price_day:"",price_week:"",price_month:"",type:"Sedan",seats:"5",transmission:"Tự động"};
   var[f,setF]=useState(Object.assign({},ef));var[errors,setErrors]=useState({});
 
@@ -423,12 +423,27 @@ function VehTab(p){
               <div className="space-y-1 text-sm mb-3 pb-3 border-b">
                 <Rw l="ODO" r={fm(v.odo)+" km"}/><Rw l="Ngày" r={fm(v.price_day)+"đ"} rc="text-blue-600"/><Rw l="Tuần" r={fm(v.price_week)+"đ"} rc="text-green-600"/><Rw l="Tháng" r={fm(v.price_month)+"đ"} rc="text-purple-600"/>
               </div>
-              {p.cw&&<button onClick={function(){setEditing(Object.assign({},v))}} className="w-full bg-blue-50 text-blue-600 py-1.5 rounded-lg text-xs hover:bg-blue-100 flex items-center justify-center gap-1"><Edit2 className="w-3.5 h-3.5"/>Sửa</button>}
+              <div className="flex gap-2">
+                {p.cw&&<button onClick={function(){setEditing(Object.assign({},v))}} className="flex-1 bg-blue-50 text-blue-600 py-1.5 rounded-lg text-xs hover:bg-blue-100 flex items-center justify-center gap-1"><Edit2 className="w-3.5 h-3.5"/>Sửa</button>}
+                <button onClick={function(){setSelV(v)}} className="flex-1 bg-green-50 text-green-600 py-1.5 rounded-lg text-xs hover:bg-green-100 flex items-center justify-center gap-1"><Calendar className="w-3.5 h-3.5"/>Lịch</button>
+              </div>
             </div>
           )
         })}
         {filtered.length===0&&<div className="col-span-full text-center py-10 text-gray-400 text-sm">Không tìm thấy</div>}
       </div>
+
+      {selV&&(<Md onClose={function(){setSelV(null)}} title={selV.name+" — "+selV.plate} wide>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
+          {[["Loại",selV.type],["Chỗ",selV.seats],["Hộp số",selV.transmission],["NL",selV.fuel],["ODO",fm(selV.odo)+"km"],["Giá/ngày",fm(selV.price_day)+"đ"]].map(function(item){
+            return(<div key={item[0]} className="bg-gray-50 rounded-lg p-2"><p className="text-xs text-gray-400">{item[0]}</p><p className="text-sm font-semibold">{item[1]}</p></div>)
+          })}
+        </div>
+        <div className="bg-blue-50 p-3 rounded-xl">
+          <h4 className="font-semibold text-sm mb-2">Lịch tháng hiện tại</h4>
+          <MiniCalVeh vehicleId={selV.id} getVS={p.getVS}/>
+        </div>
+      </Md>)}
     </div>
   )
 }
@@ -494,7 +509,9 @@ function RenTab(p){
           <SI label="Khách hàng *" value={f.customer_id} onChange={function(v){setF(Object.assign({},f,{customer_id:v}))}} options={co} error={errors.customer_id}/>
           <SI label="Xe *" value={f.vehicle_id} onChange={function(v){var vh=p.vMap[v];setF(Object.assign({},f,{vehicle_id:v,odo_start:vh?String(vh.odo):""}))}} options={vo} error={errors.vehicle_id}/>
           <FI label="Ngày nhận *" type="date" value={f.start_date} onChange={function(v){setF(Object.assign({},f,{start_date:v}))}} error={errors.start_date}/>
+          <FI label="Giờ nhận" type="time" value={f.start_time} onChange={function(v){setF(Object.assign({},f,{start_time:v}))}}/>
           <FI label="Ngày trả *" type="date" value={f.end_date} onChange={function(v){setF(Object.assign({},f,{end_date:v}))}} error={errors.end_date}/>
+          <FI label="Giờ trả" type="time" value={f.end_time} onChange={function(v){setF(Object.assign({},f,{end_time:v}))}}/>
           <SI label="Loại thuê" value={f.rental_type} onChange={function(v){setF(Object.assign({},f,{rental_type:v}))}} options={[{value:"day",label:"Ngày"},{value:"week",label:"Tuần"},{value:"month",label:"Tháng"}]}/>
           <FI label="ODO nhận *" type="number" value={f.odo_start} onChange={function(v){setF(Object.assign({},f,{odo_start:v}))}} error={errors.odo_start}/>
           {bp>0&&(<div className="sm:col-span-2 p-3 bg-white rounded-xl border"><p className="text-sm text-gray-600 mb-2">Giá gốc: <span className="font-bold text-blue-600">{fm(bp)}đ</span></p><FI label="Giá tùy chỉnh" type="number" value={f.custom_price} onChange={function(v){setF(Object.assign({},f,{custom_price:v}))}} placeholder={fm(bp)}/></div>)}
@@ -510,7 +527,7 @@ function RenTab(p){
           return(<tr key={r.id} className="hover:bg-gray-50">
             <td className="px-3 py-2.5"><p className="font-medium">{p.cN(r.customer_id)}</p><p className="text-xs text-gray-400">{p.cPh(r.customer_id)}</p></td>
             <td className="px-3 py-2.5"><p>{v?v.name:""}</p><p className="text-xs text-gray-400">{v?v.plate:""}</p></td>
-            <td className="px-3 py-2.5 whitespace-nowrap"><p>{fd(r.start_date)}</p><p className="text-xs text-gray-400">→ {fd(r.end_date)}</p></td>
+            <td className="px-3 py-2.5 whitespace-nowrap"><p>{fd(r.start_date)} <span className="text-gray-400">{r.start_time||""}</span></p><p className="text-xs text-gray-400">→ {fd(r.end_date)} <span>{r.end_time||""}</span></p></td>
             <td className="px-3 py-2.5 text-right font-semibold text-green-600">{fm(r.total)}đ{r.surcharge>0&&<span className="text-orange-500 text-xs block">+{fm(r.surcharge)}</span>}</td>
             <td className="px-3 py-2.5"><Bg color={stC}>{stT}</Bg></td>
             <td className="px-3 py-2.5">{r.status==="active"&&p.cw&&(<div className="flex gap-1">
@@ -640,6 +657,27 @@ function ExpTab(p){
   )
 }
 
+/* ══ MINI CALENDAR cho Vehicle Detail ══ */
+function MiniCalVeh(p){
+  var now=new Date();var yr=now.getFullYear();var mo=now.getMonth();var dim=new Date(yr,mo+1,0).getDate();
+  var sd=new Date(yr,mo,1).getDay();var dn=["CN","T2","T3","T4","T5","T6","T7"];
+  var empties=[];for(var i=0;i<sd;i++)empties.push(i);
+  var days=[];for(var dd=1;dd<=dim;dd++)days.push(dd);
+  var t=td();
+  return(
+    <div className="grid grid-cols-7 gap-1">
+      {dn.map(function(d){return(<div key={d} className="text-center text-xs font-semibold text-gray-400 py-0.5">{d}</div>)})}
+      {empties.map(function(i){return(<div key={"e"+i}/>)})}
+      {days.map(function(dt){
+        var ds=yr+"-"+String(mo+1).padStart(2,"0")+"-"+String(dt).padStart(2,"0");
+        var vs=p.getVS(p.vehicleId,ds);var isT=ds===t;
+        var clr=vs.status==="available"?"bg-green-100 text-green-700":"bg-red-100 text-red-700";
+        return(<div key={dt} className={"text-center py-1.5 rounded text-xs font-semibold "+(isT?"ring-2 ring-blue-500 ":"")+clr}>{dt}</div>)
+      })}
+    </div>
+  )
+}
+
 /* ══ CALENDAR ══ */
 function CalTab(p){
   var yr=p.month.getFullYear();var mo=p.month.getMonth();var dim=new Date(yr,mo+1,0).getDate();
@@ -647,13 +685,91 @@ function CalTab(p){
   var empties=[];for(var i=0;i<sd;i++)empties.push(i);
   var days=[];for(var d=1;d<=dim;d++)days.push(d);
   var t=td();
+  var[showBooking,setShowBooking]=useState(false);
+  var[selBookV,setSelBookV]=useState(null);
+  var[selBookD,setSelBookD]=useState(null);
+  var[linkCopied,setLinkCopied]=useState(false);
+
+  var copyLink=function(){
+    var url=window.location.origin+window.location.pathname;
+    try{navigator.clipboard.writeText(url);setLinkCopied(true);setTimeout(function(){setLinkCopied(false)},3000)}catch(e){prompt("Copy link này gửi khách:",url)}
+  };
+  var contactPhone="0819546586";
+  var contactName="Mr. Khánh";
+  var contactAddr="15A Lê Quang Đạo & Tây Mỗ";
+
+  if(showBooking){
+    return(
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold">Giao diện khách hàng xem</h2>
+          <button onClick={function(){setShowBooking(false)}} className="bg-gray-200 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 hover:bg-gray-300"><X className="w-4 h-4"/>Đóng</button>
+        </div>
+        <div className="flex items-center justify-center gap-3 mb-4 bg-white rounded-xl shadow-sm border p-3">
+          <button onClick={function(){p.setMonth(new Date(yr,mo-1,1))}} className="p-2 bg-blue-600 text-white rounded-lg"><ChevronLeft className="w-5 h-5"/></button>
+          <h2 className="text-xl font-bold">Tháng {mo+1}/{yr}</h2>
+          <button onClick={function(){p.setMonth(new Date(yr,mo+1,1))}} className="p-2 bg-blue-600 text-white rounded-lg"><ChevronRight className="w-5 h-5"/></button>
+        </div>
+        {p.vehicles.map(function(v){
+          return(
+            <div key={v.id} className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b">
+                <div className="flex items-center gap-3"><span className="text-4xl sm:text-5xl">{v.image}</span><div><h3 className="text-xl sm:text-2xl font-bold">{v.name}</h3><p className="text-gray-500 text-sm">{v.plate} — {v.type} — {v.seats} chỗ</p></div></div>
+                <p className="text-xl sm:text-2xl font-bold text-blue-600 whitespace-nowrap">{fm(v.price_day)}đ/ngày</p>
+              </div>
+              <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                {dn.map(function(d){return(<div key={d} className="text-center font-bold text-gray-500 py-1 text-xs sm:text-sm">{d}</div>)})}
+                {empties.map(function(i){return(<div key={"e"+i}/>)})}
+                {days.map(function(dt){
+                  var ds=yr+"-"+String(mo+1).padStart(2,"0")+"-"+String(dt).padStart(2,"0");
+                  var vs=p.getVS(v.id,ds);var past=ds<t;var disabled=vs.status==="rented"||past;
+                  var bg=past?"bg-gray-100 opacity-40 cursor-not-allowed":vs.status==="available"?"bg-green-50 hover:bg-green-100 hover:scale-105 cursor-pointer shadow-sm":"bg-red-50 cursor-not-allowed";
+                  var isToday=ds===t;
+                  return(
+                    <button key={dt} disabled={disabled} onClick={function(){if(!disabled){setSelBookV(v);setSelBookD(ds)}}} className={"rounded-xl p-1.5 sm:p-3 min-h-[56px] sm:min-h-[80px] transition border "+(isToday?"border-blue-500 border-2":"border-gray-200")+" "+bg}>
+                      <p className="text-sm sm:text-lg font-bold">{dt}</p>
+                      <p className={"text-[10px] sm:text-xs font-semibold "+(past?"text-gray-400":vs.status==="available"?"text-green-600":"text-red-600")}>{past?"—":vs.status==="available"?"Trống":"Đã thuê"}</p>
+                      {vs.time&&!past&&(<p className="text-[10px] text-orange-600">Trả: {vs.time}</p>)}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+
+        {selBookV&&selBookD&&(
+          <Md onClose={function(){setSelBookV(null);setSelBookD(null)}} title={selBookV.name}>
+            <p className="text-gray-600 text-sm mb-4">Ngày: {fd(selBookD)}</p>
+            <div className="space-y-2 mb-5">
+              <div className="p-3 bg-gray-50 rounded-xl flex justify-between items-center"><span className="text-sm text-gray-600">Giá/Ngày</span><span className="text-xl font-bold">{fm(selBookV.price_day)}đ</span></div>
+              <div className="p-3 bg-gray-50 rounded-xl flex justify-between items-center"><span className="text-sm text-gray-600">Giá/Tuần</span><span className="text-xl font-bold">{fm(selBookV.price_week)}đ</span></div>
+              <div className="p-3 bg-gray-50 rounded-xl flex justify-between items-center"><span className="text-sm text-gray-600">Giá/Tháng</span><span className="text-xl font-bold">{fm(selBookV.price_month)}đ</span></div>
+            </div>
+            <a href={"https://zalo.me/"+contactPhone+"?text=Xin chào "+contactName+", tôi muốn thuê xe "+selBookV.name+" ("+selBookV.plate+") ngày "+fd(selBookD)} target="_blank" rel="noopener noreferrer" className="block w-full bg-blue-600 text-white py-3 rounded-xl text-center font-bold mb-2 hover:bg-blue-700">💬 Đặt qua Zalo: {contactPhone}</a>
+            <a href={"tel:"+contactPhone} className="block w-full bg-green-600 text-white py-3 rounded-xl text-center font-bold mb-2 hover:bg-green-700">📞 Gọi ngay: {contactPhone}</a>
+            <div className="mt-3 p-3 bg-gray-50 rounded-xl text-sm text-center text-gray-600">
+              <p className="font-semibold">{contactName}</p>
+              <p>📍 {contactAddr}</p>
+            </div>
+          </Md>
+        )}
+      </div>
+    )
+  }
 
   return(
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <button onClick={function(){p.setMonth(new Date(yr,mo-1,1))}} className="p-1.5 hover:bg-gray-100 rounded-lg"><ChevronLeft className="w-5 h-5"/></button>
-        <h2 className="text-xl font-bold">Tháng {mo+1}/{yr}</h2>
-        <button onClick={function(){p.setMonth(new Date(yr,mo+1,1))}} className="p-1.5 hover:bg-gray-100 rounded-lg"><ChevronRight className="w-5 h-5"/></button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <button onClick={function(){p.setMonth(new Date(yr,mo-1,1))}} className="p-1.5 hover:bg-gray-100 rounded-lg"><ChevronLeft className="w-5 h-5"/></button>
+          <h2 className="text-xl font-bold">Tháng {mo+1}/{yr}</h2>
+          <button onClick={function(){p.setMonth(new Date(yr,mo+1,1))}} className="p-1.5 hover:bg-gray-100 rounded-lg"><ChevronRight className="w-5 h-5"/></button>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={function(){setShowBooking(true)}} className="bg-purple-600 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 hover:bg-purple-700 text-sm"><Eye className="w-4 h-4"/>Xem giao diện khách</button>
+          <button onClick={copyLink} className={"px-3 py-2 rounded-lg flex items-center gap-1.5 text-sm "+(linkCopied?"bg-green-600 text-white":"bg-blue-600 text-white hover:bg-blue-700")}>{linkCopied?<span>✅ Đã copy link!</span>:<span className="flex items-center gap-1.5"><Eye className="w-4 h-4"/>Copy link gửi khách</span>}</button>
+        </div>
       </div>
       {p.vehicles.map(function(v){
         return(
