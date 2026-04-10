@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { Car, Users, DollarSign, Calendar, Plus, TrendingUp, Clock, Edit2, Trash2, Save, X, Phone, AlertCircle, CreditCard, ChevronLeft, ChevronRight, Eye, LogOut, RotateCcw, UserPlus, Search, CheckCircle, XCircle, Filter, BarChart3 } from "lucide-react";
+import { createClient } from '@supabase/supabase-js'
 
 var EXP_L = {fuel:"Nhiên liệu",maintenance:"Bảo dưỡng",repair:"Sửa chữa",insurance:"Bảo hiểm",wash:"Rửa xe",road_fee:"Phí đường bộ",fine:"Phạt nguội",other:"Khác"};
 var EXP_O = Object.entries(EXP_L).map(function(e){return{value:e[0],label:e[1]}});
@@ -20,33 +21,38 @@ var US=[
   {id:"u4",username:"accountant",password:"acc123",role:"accountant",name:"Kế toán",phone:"0945678901"}
 ];
 
-function mkData(){
-  var V=[
-    {id:"v1",name:"Toyota Camry 2023",status:"available",price_day:800000,price_week:5000000,price_month:18000000,plate:"30A-12345",image:"🚗",type:"Sedan",seats:5,transmission:"Tự động",fuel:"Xăng",odo:15000},
-    {id:"v2",name:"Honda City 2023",status:"rented",price_day:600000,price_week:3800000,price_month:14000000,plate:"30B-67890",image:"🚙",type:"Sedan",seats:5,transmission:"Tự động",fuel:"Xăng",odo:8000},
-    {id:"v3",name:"Mazda CX-5 2023",status:"available",price_day:1200000,price_week:7500000,price_month:28000000,plate:"30C-11111",image:"🚐",type:"SUV",seats:7,transmission:"Tự động",fuel:"Dầu",odo:12000},
-    {id:"v4",name:"KIA Seltos 2024",status:"available",price_day:900000,price_week:5500000,price_month:20000000,plate:"30D-22222",image:"🚗",type:"SUV",seats:5,transmission:"Tự động",fuel:"Xăng",odo:3000}
-  ];
-  var C=[
-    {id:"c1",name:"Nguyễn Văn A",phone:"0901234567",address:"Quận 1, TP.HCM",id_card:"001234567890",license:"B2-123456"},
-    {id:"c2",name:"Trần Thị B",phone:"0912345678",address:"Quận 3, TP.HCM",id_card:"001234567891",license:"B2-234567"},
-    {id:"c3",name:"Lê Minh C",phone:"0933456789",address:"Quận 7, TP.HCM",id_card:"079123456789",license:"B2-345678"}
-  ];
-  var R=[
-    {id:"r1",customer_id:"c2",vehicle_id:"v2",start_date:iD(-10),start_time:"09:00",end_date:iD(2),end_time:"18:00",rental_type:"day",total_days:12,base_price:7200000,total:7200000,deposit:3000000,paid:3000000,surcharge:0,surcharge_note:"",status:"active",pickup_location:"Văn phòng",notes:"",odo_start:8000,odo_end:null,actual_return_date:null},
-    {id:"r2",customer_id:"c1",vehicle_id:"v1",start_date:iD(-20),start_time:"08:00",end_date:iD(-10),end_time:"17:00",rental_type:"day",total_days:10,base_price:8000000,total:7500000,deposit:3000000,paid:7500000,surcharge:0,surcharge_note:"",status:"completed",pickup_location:"Sân bay",notes:"",odo_start:14000,odo_end:14800,actual_return_date:iD(-10)},
-    {id:"r3",customer_id:"c3",vehicle_id:"v3",start_date:iD(-30),start_time:"09:00",end_date:iD(-20),end_time:"18:00",rental_type:"day",total_days:10,base_price:12000000,total:11000000,deposit:5000000,paid:11000000,surcharge:0,surcharge_note:"",status:"completed",pickup_location:"Văn phòng",notes:"",odo_start:11000,odo_end:11600,actual_return_date:iD(-20)},
-    {id:"r4",customer_id:"c1",vehicle_id:"v4",start_date:iD(-15),start_time:"10:00",end_date:iD(-8),end_time:"17:00",rental_type:"day",total_days:7,base_price:6300000,total:6000000,deposit:3000000,paid:6000000,surcharge:200000,surcharge_note:"Trả trễ 1 ngày",status:"completed",pickup_location:"Sân bay",notes:"",odo_start:2500,odo_end:3000,actual_return_date:iD(-7)},
-    {id:"r5",customer_id:"c2",vehicle_id:"v1",start_date:iD(-45),start_time:"08:00",end_date:iD(-35),end_time:"18:00",rental_type:"day",total_days:10,base_price:8000000,total:8000000,deposit:4000000,paid:8000000,surcharge:0,surcharge_note:"",status:"completed",pickup_location:"Văn phòng",notes:"",odo_start:13000,odo_end:13700,actual_return_date:iD(-35)}
-  ];
-  var E=[
-    {id:"e1",vehicle_id:"v1",type:"fuel",amount:500000,date:iD(-5),description:"Đổ xăng full tank"},
-    {id:"e2",vehicle_id:"v2",type:"repair",amount:1200000,date:iD(-15),description:"Thay lốp trước"},
-    {id:"e3",vehicle_id:"v1",type:"insurance",amount:5000000,date:iD(-60),description:"Gia hạn BH"},
-    {id:"e4",vehicle_id:"v3",type:"wash",amount:150000,date:iD(-3),description:"Rửa xe nội thất"},
-    {id:"e5",vehicle_id:"v4",type:"fuel",amount:400000,date:iD(-8),description:"Đổ xăng"}
-  ];
-  return{V:V,C:C,R:R,E:E};
+/* ── Supabase client ── */
+var sbUrl=import.meta.env.VITE_SUPABASE_URL||"";
+var sbKey=import.meta.env.VITE_SUPABASE_ANON_KEY||"";
+var sb=(sbUrl&&sbKey)?createClient(sbUrl,sbKey):null;
+
+/* ── DB helpers ── */
+function dbLoad(table,cb,order){
+  if(!sb){cb([]);return}
+  var q=sb.from(table).select("*");
+  if(order)q=q.order(order,{ascending:false});
+  q.then(function(res){cb(res.data||[])})
+}
+function dbInsert(table,row,cb){
+  if(!sb){cb(null);return}
+  sb.from(table).insert(row).select().single().then(function(res){
+    if(res.error){alert("Lỗi: "+res.error.message);cb(null)}
+    else{cb(res.data)}
+  })
+}
+function dbUpdate(table,id,data,cb){
+  if(!sb){cb(null);return}
+  sb.from(table).update(data).eq("id",id).select().single().then(function(res){
+    if(res.error){alert("Lỗi: "+res.error.message);cb(null)}
+    else{cb(res.data)}
+  })
+}
+function dbDelete(table,id,cb){
+  if(!sb){cb(false);return}
+  sb.from(table).delete().eq("id",id).then(function(res){
+    if(res.error){alert("Lỗi: "+res.error.message);cb(false)}
+    else{cb(true)}
+  })
 }
 
 /* ── UI Components ── */
@@ -63,12 +69,22 @@ function CM(p){return(<Md onClose={p.onCancel} title="Xác nhận"><p className=
 
 /* ══ MAIN ══ */
 export default function App(){
-  var d=useMemo(function(){return mkData()},[]);
-  var s=useState;
   var[isAuth,setIsAuth]=s(false);var[user,setUser]=s(null);var[lf,setLf]=s({u:"",p:""});var[le,setLe]=s("");
   var[tab,setTab]=s("dashboard");var[month,setMonth]=s(new Date());var[toast,setToast]=s(null);var[loading,setLoading]=s(false);
-  var[vehicles,setVehicles]=s(d.V);var[customers,setCustomers]=s(d.C);var[rentals,setRentals]=s(d.R);var[expenses,setExpenses]=s(d.E);
-  var[showBooking,setShowBooking]=s(false);
+  var[vehicles,setVehicles]=s([]);var[customers,setCustomers]=s([]);var[rentals,setRentals]=s([]);var[expenses,setExpenses]=s([]);
+  var[showBooking,setShowBooking]=s(false);var[dataLoaded,setDataLoaded]=s(false);
+
+  /* Load data from Supabase on mount */
+  var loadAll=useCallback(function(){
+    setLoading(true);
+    dbLoad("vehicles",function(d){setVehicles(d)},"created_at");
+    dbLoad("customers",function(d){setCustomers(d)},"created_at");
+    dbLoad("rentals",function(d){setRentals(d)},"created_at");
+    dbLoad("expenses",function(d){setExpenses(d);setLoading(false);setDataLoaded(true)},"created_at");
+  },[]);
+
+  /* Auto-load when logged in */
+  if(isAuth&&!dataLoaded){loadAll()}
 
   var notify=useCallback(function(m,t){setToast({msg:m,type:t||"success"});setTimeout(function(){setToast(null)},3e3)},[]);
   var hasPerm=useCallback(function(p){return user&&(PERMS[user.role]||[]).indexOf(p)>=0},[user]);
@@ -356,7 +372,7 @@ function DashTab(p){
 
 /* ══ VEHICLES ══ */
 function VehTab(p){
-  var[showAdd,setShowAdd]=useState(false);var[editing,setEditing]=useState(null);var[search,setSearch]=useState("");var[fSt,setFSt]=useState("all");var[selV,setSelV]=useState(null);
+  var[showAdd,setShowAdd]=useState(false);var[editing,setEditing]=useState(null);var[search,setSearch]=useState("");var[fSt,setFSt]=useState("all");var[selV,setSelV]=useState(null);var[delV,setDelV]=useState(null);
   var ef={name:"",plate:"",odo:"0",price_day:"",price_week:"",price_month:"",type:"Sedan",seats:"5",transmission:"Tự động"};
   var[f,setF]=useState(Object.assign({},ef));var[errors,setErrors]=useState({});
 
@@ -367,15 +383,27 @@ function VehTab(p){
     if(!f.price_day||parseInt(f.price_day)<=0)e.price_day="Phải > 0";
     setErrors(e);if(Object.keys(e).length)return;
     var pd=parseInt(f.price_day);
-    p.setVehicles(function(prev){return prev.concat([{id:uid(),name:f.name.trim(),plate:f.plate.toUpperCase(),image:"🚗",price_day:pd,price_week:parseInt(f.price_week)||pd*6,price_month:parseInt(f.price_month)||pd*25,odo:Math.max(0,parseInt(f.odo)||0),type:f.type,seats:parseInt(f.seats)||5,transmission:f.transmission,fuel:"Xăng",status:"available"}])});
-    setF(Object.assign({},ef));setShowAdd(false);setErrors({});p.notify("Thêm xe thành công!")
+    var row={name:f.name.trim(),plate:f.plate.toUpperCase(),image:"🚗",price_day:pd,price_week:parseInt(f.price_week)||pd*6,price_month:parseInt(f.price_month)||pd*25,odo:Math.max(0,parseInt(f.odo)||0),type:f.type,seats:parseInt(f.seats)||5,transmission:f.transmission,fuel:"Xăng",status:"available"};
+    dbInsert("vehicles",row,function(nv){
+      if(nv){p.setVehicles(function(prev){return prev.concat([nv])});setF(Object.assign({},ef));setShowAdd(false);setErrors({});p.notify("Thêm xe thành công!")}
+    })
   };
   var saveEdit=function(){
     if(!editing.name.trim()){p.notify("Tên xe bắt buộc","error");return}
     var old=p.vehicles.find(function(v){return v.id===editing.id});
     if(parseInt(editing.odo)<old.odo){p.notify("ODO không thể giảm!","error");return}
-    p.setVehicles(function(prev){return prev.map(function(v){return v.id===editing.id?Object.assign({},editing,{odo:parseInt(editing.odo),price_day:parseInt(editing.price_day),price_week:parseInt(editing.price_week),price_month:parseInt(editing.price_month)}):v})});
-    setEditing(null);p.notify("Cập nhật thành công!")
+    var data={name:editing.name,odo:parseInt(editing.odo),price_day:parseInt(editing.price_day),price_week:parseInt(editing.price_week),price_month:parseInt(editing.price_month)};
+    dbUpdate("vehicles",editing.id,data,function(uv){
+      if(uv){p.setVehicles(function(prev){return prev.map(function(v){return v.id===editing.id?Object.assign({},v,uv):v})});setEditing(null);p.notify("Cập nhật thành công!")}
+    })
+  };
+  var doDelete=function(){
+    var v=delV;
+    if(v.status==="rented"){p.notify("Không thể xóa xe đang thuê!","error");setDelV(null);return}
+    dbDelete("vehicles",v.id,function(ok){
+      if(ok){p.setVehicles(function(prev){return prev.filter(function(x){return x.id!==v.id})});p.notify("Đã xóa xe "+v.name)}
+      setDelV(null)
+    })
   };
   var filtered=p.vehicles.filter(function(v){if(fSt!=="all"&&v.status!==fSt)return false;if(!search)return true;var s=search.toLowerCase();return v.name.toLowerCase().indexOf(s)>=0||v.plate.toLowerCase().indexOf(s)>=0});
 
@@ -426,6 +454,7 @@ function VehTab(p){
               <div className="flex gap-2">
                 {p.cw&&<button onClick={function(){setEditing(Object.assign({},v))}} className="flex-1 bg-blue-50 text-blue-600 py-1.5 rounded-lg text-xs hover:bg-blue-100 flex items-center justify-center gap-1"><Edit2 className="w-3.5 h-3.5"/>Sửa</button>}
                 <button onClick={function(){setSelV(v)}} className="flex-1 bg-green-50 text-green-600 py-1.5 rounded-lg text-xs hover:bg-green-100 flex items-center justify-center gap-1"><Calendar className="w-3.5 h-3.5"/>Lịch</button>
+                {p.cw&&<button onClick={function(){setDelV(v)}} className="flex-1 bg-red-50 text-red-500 py-1.5 rounded-lg text-xs hover:bg-red-100 flex items-center justify-center gap-1"><Trash2 className="w-3.5 h-3.5"/>Xóa</button>}
               </div>
             </div>
           )
@@ -444,6 +473,8 @@ function VehTab(p){
           <MiniCalVeh vehicleId={selV.id} getVS={p.getVS}/>
         </div>
       </Md>)}
+
+      {delV&&<CM msg={"Xóa xe "+delV.name+" ("+delV.plate+")? Thao tác này không thể hoàn tác."} onConfirm={doDelete} onCancel={function(){setDelV(null)}}/>}
     </div>
   )
 }
@@ -467,25 +498,40 @@ function RenTab(p){
     var v=p.vMap[f.vehicle_id];if(v&&f.odo_start&&parseInt(f.odo_start)<v.odo)e.odo_start="Phải ≥ "+fm(v.odo);
     setErrors(e);if(Object.keys(e).length)return;
     var days=Math.ceil((new Date(f.end_date)-new Date(f.start_date))/864e5);var bp=calcP();var fp=parseInt(f.custom_price)||bp;var dep=Math.min(parseInt(f.deposit)||0,fp);
-    var nr={id:uid(),customer_id:f.customer_id,vehicle_id:v.id,start_date:f.start_date,start_time:f.start_time,end_date:f.end_date,end_time:f.end_time,rental_type:f.rental_type,total_days:days,base_price:bp,total:fp,deposit:dep,paid:dep,surcharge:0,surcharge_note:"",status:"active",pickup_location:f.pickup_location||"Văn phòng",notes:f.notes,odo_start:parseInt(f.odo_start),odo_end:null,actual_return_date:null};
-    p.setRentals(function(prev){return[nr].concat(prev)});
-    p.setVehicles(function(prev){return prev.map(function(x){return x.id===v.id?Object.assign({},x,{status:"rented"}):x})});
-    setF(Object.assign({},ef));setShowAdd(false);setErrors({});setPage(1);p.notify("Tạo hợp đồng thành công!")
+    var nr={customer_id:f.customer_id,vehicle_id:v.id,start_date:f.start_date,start_time:f.start_time,end_date:f.end_date,end_time:f.end_time,rental_type:f.rental_type,total_days:days,base_price:bp,total:fp,deposit:dep,paid:dep,surcharge:0,surcharge_note:"",status:"active",pickup_location:f.pickup_location||"Văn phòng",notes:f.notes,odo_start:parseInt(f.odo_start),odo_end:null,actual_return_date:null};
+    dbInsert("rentals",nr,function(saved){
+      if(saved){
+        p.setRentals(function(prev){return[saved].concat(prev)});
+        p.setVehicles(function(prev){return prev.map(function(x){return x.id===v.id?Object.assign({},x,{status:"rented"}):x})});
+        setF(Object.assign({},ef));setShowAdd(false);setErrors({});setPage(1);p.notify("Tạo hợp đồng thành công!")
+      }
+    })
   };
   var doReturn=function(){
     var r=retM;if(!rf.odo_end||parseInt(rf.odo_end)<r.odo_start){p.notify("ODO trả phải ≥ "+fm(r.odo_start)+"km","error");return}
     p.setLoading(true);
-    setTimeout(function(){
-      var sc=Math.max(0,parseInt(rf.surcharge)||0);
-      p.setRentals(function(prev){return prev.map(function(x){return x.id===r.id?Object.assign({},x,{status:"completed",odo_end:parseInt(rf.odo_end),surcharge:sc,surcharge_note:rf.surcharge_note,actual_return_date:td(),paid:x.total+sc}):x})});
-      p.setVehicles(function(prev){return prev.map(function(x){return x.id===r.vehicle_id?Object.assign({},x,{status:"available",odo:parseInt(rf.odo_end)}):x})});
-      setRetM(null);setRf({odo_end:"",surcharge:"0",surcharge_note:""});p.setLoading(false);p.notify("Trả xe thành công!")
-    },500)
+    var sc=Math.max(0,parseInt(rf.surcharge)||0);
+    var rentalData={status:"completed",odo_end:parseInt(rf.odo_end),surcharge:sc,surcharge_note:rf.surcharge_note,actual_return_date:td(),paid:r.total+sc};
+    dbUpdate("rentals",r.id,rentalData,function(ur){
+      if(ur){
+        p.setRentals(function(prev){return prev.map(function(x){return x.id===r.id?Object.assign({},x,ur):x})});
+        dbUpdate("vehicles",r.vehicle_id,{status:"available",odo:parseInt(rf.odo_end)},function(uv){
+          if(uv){p.setVehicles(function(prev){return prev.map(function(x){return x.id===r.vehicle_id?Object.assign({},x,uv):x})})}
+          setRetM(null);setRf({odo_end:"",surcharge:"0",surcharge_note:""});p.setLoading(false);p.notify("Trả xe thành công!")
+        })
+      }else{p.setLoading(false)}
+    })
   };
   var doCancel=function(){
-    p.setRentals(function(prev){return prev.map(function(x){return x.id===canM.id?Object.assign({},x,{status:"cancelled"}):x})});
-    p.setVehicles(function(prev){return prev.map(function(x){return x.id===canM.vehicle_id?Object.assign({},x,{status:"available"}):x})});
-    setCanM(null);p.notify("Đã hủy")
+    dbUpdate("rentals",canM.id,{status:"cancelled"},function(ur){
+      if(ur){
+        p.setRentals(function(prev){return prev.map(function(x){return x.id===canM.id?Object.assign({},x,{status:"cancelled"}):x})});
+        dbUpdate("vehicles",canM.vehicle_id,{status:"available"},function(uv){
+          if(uv){p.setVehicles(function(prev){return prev.map(function(x){return x.id===canM.vehicle_id?Object.assign({},x,{status:"available"}):x})})}
+          setCanM(null);p.notify("Đã hủy")
+        })
+      }
+    })
   };
   var bp=calcP();
   var fl=p.rentals.filter(function(r){if(filter!=="all"&&r.status!==filter)return false;if(!search)return true;var s=search.toLowerCase();return p.cN(r.customer_id).toLowerCase().indexOf(s)>=0||p.vN(r.vehicle_id).toLowerCase().indexOf(s)>=0}).sort(function(a,b){return(b.start_date||"").localeCompare(a.start_date||"")});
@@ -559,8 +605,9 @@ function CusTab(p){
     var e={};if(!f.name.trim())e.name="Bắt buộc";if(!f.phone)e.phone="Bắt buộc";else if(!/^0\d{9}$/.test(f.phone))e.phone="10 số, bắt đầu bằng 0";else if(p.customers.some(function(c){return c.phone===f.phone}))e.phone="Đã tồn tại";
     if(f.id_card&&!/^\d{9}$|^\d{12}$/.test(f.id_card))e.id_card="9 hoặc 12 số";
     setErrors(e);if(Object.keys(e).length)return;
-    p.setCustomers(function(prev){return prev.concat([Object.assign({id:uid()},f)])});
-    setF(Object.assign({},ef));setShowAdd(false);setErrors({});p.notify("Thêm KH thành công!")
+    dbInsert("customers",f,function(nc){
+      if(nc){p.setCustomers(function(prev){return prev.concat([nc])});setF(Object.assign({},ef));setShowAdd(false);setErrors({});p.notify("Thêm KH thành công!")}
+    })
   };
   var fl=p.customers.filter(function(c){if(!search)return true;var s=search.toLowerCase();return c.name.toLowerCase().indexOf(s)>=0||c.phone.indexOf(s)>=0});
   var pg=fl.slice((page-1)*PS,page*PS);
@@ -612,8 +659,10 @@ function ExpTab(p){
   var add=function(){
     var e={};if(!f.vehicle_id)e.vehicle_id="Chọn xe";if(!f.type)e.type="Chọn loại";if(!f.amount||parseInt(f.amount)<=0)e.amount="> 0";if(!f.date)e.date="Chọn ngày";
     setErrors(e);if(Object.keys(e).length)return;
-    p.setExpenses(function(prev){return[{id:uid(),vehicle_id:f.vehicle_id,type:f.type,amount:parseInt(f.amount),date:f.date,description:f.description}].concat(prev)});
-    setF(Object.assign({},ef));setShowAdd(false);setErrors({});p.notify("Thêm thành công!")
+    var row={vehicle_id:f.vehicle_id,type:f.type,amount:parseInt(f.amount),date:f.date,description:f.description};
+    dbInsert("expenses",row,function(ne){
+      if(ne){p.setExpenses(function(prev){return[ne].concat(prev)});setF(Object.assign({},ef));setShowAdd(false);setErrors({});p.notify("Thêm thành công!")}
+    })
   };
   var tot=p.expenses.reduce(function(s,e){return s+e.amount},0);
   var vo=p.vehicles.map(function(v){return{value:v.id,label:v.name+" — "+v.plate}});
@@ -652,7 +701,7 @@ function ExpTab(p){
         })}</tbody></table>
       </div>{pg.length===0&&<p className="text-center py-8 text-gray-400 text-sm">Không có</p>}</div>
       <Pg page={page} total={fl.length} onChange={setPage}/>
-      {delC&&<CM msg={"Xóa chi phí "+fm(delC.amount)+"đ?"} onConfirm={function(){p.setExpenses(function(prev){return prev.filter(function(x){return x.id!==delC.id})});setDelC(null);p.notify("Đã xóa")}} onCancel={function(){setDelC(null)}}/>}
+      {delC&&<CM msg={"Xóa chi phí "+fm(delC.amount)+"đ?"} onConfirm={function(){dbDelete("expenses",delC.id,function(ok){if(ok){p.setExpenses(function(prev){return prev.filter(function(x){return x.id!==delC.id})});p.notify("Đã xóa")}setDelC(null)})}} onCancel={function(){setDelC(null)}}/>}
     </div>
   )
 }
