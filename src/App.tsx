@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Car, Users, DollarSign, Calendar, Search, Plus, TrendingUp, Clock, CheckCircle, XCircle, Edit2, Trash2, Save, X, Phone, AlertCircle, CreditCard, ChevronLeft, ChevronRight, Eye, LogOut, RotateCcw, UserPlus, Filter, BarChart3 } from 'lucide-react';
+import { Car, Users, DollarSign, Calendar, Search, Plus, TrendingUp, Clock, CheckCircle, XCircle, Edit2, Trash2, Save, X, Phone, AlertCircle, CreditCard, ChevronLeft, ChevronRight, Eye, LogOut, RotateCcw, UserPlus, Filter, BarChart3, Link as LinkIcon } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // ===== SUPABASE SETUP =====
@@ -66,7 +66,7 @@ const WRITE_PERMS: any = {
 const ROLE_LABELS: any = { admin: "Quản trị", manager: "Quản lý", sale: "Kinh doanh", accountant: "Kế toán" };
 const PAGE_SIZE = 10;
 
-// Mock users for demo (trong production nên dùng Supabase Auth)
+// Mock users for demo
 const DEMO_USERS = [
   { id: "u1", username: "admin", password: "admin123", role: "admin", name: "Admin", phone: "0901234567" },
   { id: "u2", username: "sale1", password: "sale123", role: "sale", name: "Sale 1", phone: "0912345678" },
@@ -204,8 +204,12 @@ function ConfirmModal({ msg, onConfirm, onCancel }: any) {
 
 // ===== MAIN APP =====
 export default function App() {
-  const [isAuth, setIsAuth] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  // Load saved session from localStorage
+  const savedSession = localStorage.getItem('autorent_session');
+  const initialSession = savedSession ? JSON.parse(savedSession) : null;
+  
+  const [isAuth, setIsAuth] = useState(!!initialSession);
+  const [user, setUser] = useState<any>(initialSession);
   const [loginForm, setLoginForm] = useState({ u: "", p: "" });
   const [loginError, setLoginError] = useState("");
   const [tab, setTab] = useState("dashboard");
@@ -297,9 +301,22 @@ export default function App() {
       setLoginError("Sai tên đăng nhập hoặc mật khẩu");
       return;
     }
+    
+    // Save session to localStorage
+    localStorage.setItem('autorent_session', JSON.stringify(foundUser));
+    
     setUser(foundUser);
     setIsAuth(true);
     setLoginError("");
+  };
+
+  const handleLogout = () => {
+    // Clear session from localStorage
+    localStorage.removeItem('autorent_session');
+    
+    setIsAuth(false);
+    setUser(null);
+    setDataLoaded(false);
   };
 
   if (!isAuth) {
@@ -366,7 +383,7 @@ export default function App() {
             </div>
           </div>
           <button 
-            onClick={() => { setIsAuth(false); setUser(null); setDataLoaded(false); }} 
+            onClick={handleLogout} 
             className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm shrink-0"
           >
             <LogOut className="w-4 h-4" />
@@ -399,11 +416,11 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         {tab === "dashboard" && <DashboardTab vehicles={vehicles} rentals={rentals} expenses={expenses} customers={customers} customerName={customerName} vMap={vMap} />}
-        {tab === "vehicles" && <VehiclesTab vehicles={vehicles} setVehicles={setVehicles} getVehicleStatus={getVehicleStatus} month={month} notify={notify} canWrite={canWrite("vehicles")} />}
+        {tab === "vehicles" && <VehiclesTab vehicles={vehicles} setVehicles={setVehicles} rentals={rentals} getVehicleStatus={getVehicleStatus} month={month} notify={notify} canWrite={canWrite("vehicles")} />}
         {tab === "rentals" && <RentalsTab vehicles={vehicles} setVehicles={setVehicles} customers={customers} rentals={rentals} setRentals={setRentals} checkOverlap={checkOverlap} notify={notify} setLoading={setLoading} customerName={customerName} customerPhone={customerPhone} vehicleName={vehicleName} vehiclePlate={vehiclePlate} vMap={vMap} canWrite={canWrite("rentals")} />}
         {tab === "customers" && <CustomersTab customers={customers} setCustomers={setCustomers} rentals={rentals} vehicleName={vehicleName} notify={notify} canWrite={canWrite("customers")} />}
         {tab === "expenses" && <ExpensesTab vehicles={vehicles} expenses={expenses} setExpenses={setExpenses} notify={notify} canWrite={canWrite("expenses")} vMap={vMap} />}
-        {tab === "calendar" && <CalendarTab vehicles={vehicles} getVehicleStatus={getVehicleStatus} customerName={customerName} month={month} setMonth={setMonth} />}
+        {tab === "calendar" && <CalendarTab vehicles={vehicles} getVehicleStatus={getVehicleStatus} customerName={customerName} month={month} setMonth={setMonth} notify={notify} currentUser={user} />}
       </main>
     </div>
   );
@@ -509,10 +526,11 @@ function DashboardTab({ vehicles, rentals, expenses, customers, customerName, vM
   );
 }
 
-function VehiclesTab({ vehicles, setVehicles, canWrite, notify }: any) {
+function VehiclesTab({ vehicles, setVehicles, rentals, canWrite, notify }: any) {
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<any>(null);
   const emptyForm = { name: "", plate: "", odo: "0", price_day: "", price_week: "", price_month: "", type: "Sedan", seats: "5", transmission: "Tự động", fuel: "Xăng", image: "🚗" };
   const [form, setForm] = useState<any>({ ...emptyForm });
   const [errors, setErrors] = useState<any>({});
@@ -585,6 +603,26 @@ function VehiclesTab({ vehicles, setVehicles, canWrite, notify }: any) {
         setEditing(null);
         notify("✅ Cập nhật thành công!");
       }
+    });
+  };
+
+  const doDelete = () => {
+    const v = deleteConfirm;
+    
+    // Check if vehicle has active rentals
+    const hasActiveRentals = rentals.some((r: any) => r.vehicle_id === v.id && r.status === "active");
+    if (hasActiveRentals) {
+      notify("❌ Không thể xóa xe đang có hợp đồng!", "error");
+      setDeleteConfirm(null);
+      return;
+    }
+
+    dbDelete('vehicles', v.id, (ok: boolean) => {
+      if (ok) {
+        setVehicles((prev: any) => prev.filter((x: any) => x.id !== v.id));
+        notify("✅ Đã xóa xe " + v.name);
+      }
+      setDeleteConfirm(null);
     });
   };
 
@@ -692,6 +730,12 @@ function VehiclesTab({ vehicles, setVehicles, canWrite, notify }: any) {
                   >
                     <Edit2 className="w-3.5 h-3.5" />Sửa
                   </button>
+                  <button 
+                    onClick={() => setDeleteConfirm(v)} 
+                    className="flex-1 bg-red-50 text-red-500 py-1.5 rounded-lg text-xs hover:bg-red-100 flex items-center justify-center gap-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />Xóa
+                  </button>
                 </div>
               )}
             </div>
@@ -702,10 +746,17 @@ function VehiclesTab({ vehicles, setVehicles, canWrite, notify }: any) {
           <div className="col-span-full text-center py-10 text-gray-400 text-sm">Không tìm thấy xe</div>
         )}
       </div>
+
+      {deleteConfirm && (
+        <ConfirmModal 
+          msg={`Xóa xe ${deleteConfirm.name} (${deleteConfirm.plate})? Không thể hoàn tác.`} 
+          onConfirm={doDelete} 
+          onCancel={() => setDeleteConfirm(null)} 
+        />
+      )}
     </div>
   );
 }
-
 function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, checkOverlap, notify, setLoading, customerName, vehicleName, vehiclePlate, vMap, canWrite }: any) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -1340,34 +1391,61 @@ function ExpensesTab({ expenses, setExpenses, vehicles, vMap, notify, canWrite }
   );
 }
 
-function CalendarTab({ vehicles, getVehicleStatus, customerName, month, setMonth }: any) {
+function CalendarTab({ vehicles, getVehicleStatus, customerName, month, setMonth, notify, currentUser }: any) {
   const year = month.getFullYear();
   const monthNum = month.getMonth();
   const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
   const startDay = new Date(year, monthNum, 1).getDay();
   const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
   const today = todayString();
+  const [shareLink, setShareLink] = useState("");
   
   const empties = Array.from({ length: startDay }, (_, i) => i);
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
+  const generateShareLink = () => {
+    const link = `${window.location.origin}?view=booking`;
+    setShareLink(link);
+    navigator.clipboard.writeText(link);
+    notify("✅ Đã copy link vào clipboard!");
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-center gap-3 mb-4 bg-white rounded-xl shadow-sm border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setMonth(new Date(year, monthNum - 1, 1))} 
+            className="p-1.5 hover:bg-gray-100 rounded-lg"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <h2 className="text-xl font-bold">Tháng {monthNum + 1}/{year}</h2>
+          <button 
+            onClick={() => setMonth(new Date(year, monthNum + 1, 1))} 
+            className="p-1.5 hover:bg-gray-100 rounded-lg"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
         <button 
-          onClick={() => setMonth(new Date(year, monthNum - 1, 1))} 
-          className="p-1.5 hover:bg-gray-100 rounded-lg"
+          onClick={generateShareLink} 
+          className="bg-blue-600 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 hover:bg-blue-700 text-sm"
         >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <h2 className="text-xl font-bold">Tháng {monthNum + 1}/{year}</h2>
-        <button 
-          onClick={() => setMonth(new Date(year, monthNum + 1, 1))} 
-          className="p-1.5 hover:bg-gray-100 rounded-lg"
-        >
-          <ChevronRight className="w-5 h-5" />
+          <LinkIcon className="w-4 h-4" />
+          Tạo link gửi khách
         </button>
       </div>
+
+      {shareLink && (
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+          <p className="font-semibold mb-2">📋 Link booking đã được copy!</p>
+          <div className="bg-white p-3 rounded border break-all text-sm mb-2">
+            {shareLink}
+          </div>
+          <p className="text-sm text-gray-600">Khách hàng click vào link sẽ thấy lịch trống và thông tin xe để đặt lịch</p>
+        </div>
+      )}
       
       {vehicles.map((v: any) => (
         <div key={v.id} className="bg-white rounded-xl shadow-sm border p-3 sm:p-4">
