@@ -1,91 +1,95 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Car, Users, DollarSign, Calendar, Search, Plus, TrendingUp, Clock, CheckCircle, XCircle, Edit2, Trash2, Save, X, Phone, AlertCircle, CreditCard, ChevronLeft, ChevronRight, Eye, LogOut, RotateCcw, UserPlus, Filter, BarChart3, Link as LinkIcon } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Car, DollarSign, TrendingUp, Calendar, Users, Wrench, LayoutDashboard, LogOut, Plus, Save, Search, Edit, Trash2, X, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, UserPlus, AlertCircle, Link as LinkIcon, Phone } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
-// ===== SUPABASE SETUP =====
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-// ===== DATABASE FUNCTIONS =====
-function dbLoad(table: string, callback: Function, orderBy?: string) {
-  if (!supabase) { callback([]); return; }
-  let query = supabase.from(table).select('*') as any;
-  if (orderBy) query = query.order(orderBy, { ascending: false });
-  query.then((res: any) => callback(res.data || []));
-}
-
-function dbInsert(table: string, row: any, callback: Function) {
-  if (!supabase) { callback(null); return; }
-  supabase.from(table).insert(row).select().single().then((res: any) => {
-    if (res.error) { alert('❌ Lỗi: ' + res.error.message); callback(null); }
-    else { callback(res.data); }
-  });
-}
-
-function dbUpdate(table: string, id: string, data: any, callback: Function) {
-  if (!supabase) { callback(null); return; }
-  supabase.from(table).update(data).eq('id', id).select().single().then((res: any) => {
-    if (res.error) { alert('❌ Lỗi: ' + res.error.message); callback(null); }
-    else { callback(res.data); }
-  });
-}
-
-function dbDelete(table: string, id: string, callback: Function) {
-  if (!supabase) { callback(false); return; }
-  supabase.from(table).delete().eq('id', id).then((res: any) => {
-    if (res.error) { alert('❌ Lỗi: ' + res.error.message); callback(false); }
-    else { callback(true); }
-  });
-}
-
-// ===== CONSTANTS =====
-const EXP_LABELS: any = { 
-  fuel: "Nhiên liệu", 
-  maintenance: "Bảo dưỡng", 
-  repair: "Sửa chữa", 
-  insurance: "Bảo hiểm", 
-  wash: "Rửa xe", 
-  road_fee: "Phí đường bộ", 
-  fine: "Phạt nguội", 
-  other: "Khác" 
-};
-const EXP_OPTIONS = Object.entries(EXP_LABELS).map(([value, label]) => ({ value, label }));
-const PERMISSIONS: any = { 
-  admin: ["dashboard", "vehicles", "rentals", "customers", "expenses", "calendar"], 
-  manager: ["dashboard", "vehicles", "rentals", "customers", "expenses", "calendar"], 
-  sale: ["dashboard", "rentals", "customers", "calendar"], 
-  accountant: ["dashboard", "expenses"] 
-};
-const WRITE_PERMS: any = { 
-  vehicles: ["admin", "manager"], 
-  rentals: ["admin", "manager", "sale"], 
-  customers: ["admin", "manager", "sale"], 
-  expenses: ["admin", "manager", "accountant"] 
-};
-const ROLE_LABELS: any = { admin: "Quản trị", manager: "Quản lý", sale: "Kinh doanh", accountant: "Kế toán" };
+// Types & Constants
 const PAGE_SIZE = 10;
-
-// Mock users for demo
 const DEMO_USERS = [
-  { id: "u1", username: "admin", password: "admin123", role: "admin", name: "Admin", phone: "0901234567" },
-  { id: "u2", username: "sale1", password: "sale123", role: "sale", name: "Sale 1", phone: "0912345678" },
-  { id: "u3", username: "manager", password: "manager123", role: "manager", name: "Manager", phone: "0934567890" },
-  { id: "u4", username: "accountant", password: "acc123", role: "accountant", name: "Kế toán", phone: "0945678901" },
+  { id: "1", username: "admin", name: "Admin", role: "admin" },
+  { id: "2", username: "sale1", name: "Sale 1", role: "sale" },
+  { id: "3", username: "manager", name: "Manager", role: "manager" },
+  { id: "4", username: "accountant", name: "Kế toán", role: "accountant" }
 ];
 
-// ===== UTILITY FUNCTIONS =====
-const formatNumber = (n: any) => n ? n.toLocaleString("vi-VN") : "0";
-const formatDate = (s: any) => { try { return new Date(s).toLocaleDateString("vi-VN"); } catch { return s; } };
-const todayString = () => new Date().toISOString().split("T")[0];
+const PERMISSIONS: any = {
+  admin: ["dashboard", "vehicles", "rentals", "customers", "expenses", "calendar"],
+  manager: ["dashboard", "vehicles", "rentals", "customers", "expenses", "calendar"],
+  sale: ["dashboard", "rentals", "customers", "calendar"],
+  accountant: ["dashboard", "expenses"]
+};
 
-// ===== UI COMPONENTS =====
+const WRITE_PERMS: any = {
+  vehicles: ["admin", "manager"],
+  rentals: ["admin", "manager", "sale"],
+  customers: ["admin", "manager", "sale"],
+  expenses: ["admin", "manager", "accountant"]
+};
+
+const EXP_OPTIONS = [
+  { value: "fuel", label: "Xăng" },
+  { value: "maintenance", label: "Bảo dưỡng" },
+  { value: "repair", label: "Sửa chữa" },
+  { value: "insurance", label: "Bảo hiểm" },
+  { value: "wash", label: "Rửa xe" },
+  { value: "road_fee", label: "Phí đường" },
+  { value: "fine", label: "Phạt nguội" },
+  { value: "other", label: "Khác" }
+];
+
+const EXP_LABELS: any = {
+  fuel: "Xăng", maintenance: "Bảo dưỡng", repair: "Sửa chữa", insurance: "Bảo hiểm",
+  wash: "Rửa xe", road_fee: "Phí đường", fine: "Phạt nguội", other: "Khác"
+};
+
+// Utility functions
+const todayString = () => new Date().toISOString().split("T")[0];
+const formatNumber = (n: number) => n?.toLocaleString("vi-VN") || "0";
+const formatDate = (d: string) => {
+  if (!d) return "";
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
+};
+
+// Supabase helpers
+const dbLoad = (table: string, callback: (data: any) => void, orderBy = 'id') => {
+  supabase.from(table).select('*').order(orderBy, { ascending: false })
+    .then(({ data, error }) => {
+      if (error) console.error(error);
+      else callback(data || []);
+    });
+};
+
+const dbInsert = (table: string, row: any, callback: (data: any) => void) => {
+  supabase.from(table).insert(row).select().single()
+    .then(({ data, error }) => {
+      if (error) console.error(error);
+      else callback(data);
+    });
+};
+
+const dbUpdate = (table: string, id: string, updates: any, callback: (data: any) => void) => {
+  supabase.from(table).update(updates).eq('id', id).select().single()
+    .then(({ data, error }) => {
+      if (error) console.error(error);
+      else callback(data);
+    });
+};
+
+const dbDelete = (table: string, id: string, callback: (ok: boolean) => void) => {
+  supabase.from(table).delete().eq('id', id)
+    .then(({ error }) => callback(!error));
+};
+
+// UI Components
 function Toast({ toast }: any) {
   if (!toast) return null;
-  const isError = toast.type === "error";
+  const bg = toast.type === "error" ? "bg-red-600" : "bg-green-600";
   return (
-    <div className={`fixed top-4 right-4 z-[60] px-5 py-3 rounded-xl shadow-xl text-white text-sm font-medium flex items-center gap-2 ${isError ? "bg-red-500" : "bg-green-500"}`}>
-      {isError ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+    <div className={`fixed top-4 right-4 ${bg} text-white px-6 py-3 rounded-xl shadow-2xl z-50 animate-bounce`}>
       {toast.msg}
     </div>
   );
@@ -93,22 +97,19 @@ function Toast({ toast }: any) {
 
 function Spinner() {
   return (
-    <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center">
-      <div className="bg-white px-6 py-4 rounded-xl shadow-xl flex items-center gap-3">
-        <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        Đang xử lý...
-      </div>
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+      <div className="w-16 h-16 border-4 border-white border-t-blue-600 rounded-full animate-spin" />
     </div>
   );
 }
 
-function Modal({ onClose, title, children, wide }: any) {
+function Modal({ children, onClose, title }: any) {
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3" onClick={onClose}>
-      <div className={`bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 ${wide ? "max-w-4xl" : "max-w-lg"}`} onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold truncate pr-4">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 shrink-0">
+          <h3 className="text-xl font-bold">{title}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -118,407 +119,176 @@ function Modal({ onClose, title, children, wide }: any) {
   );
 }
 
-function FormInput({ label, value, onChange, placeholder, type = "text", error, className = "", textarea = false, disabled = false }: any) {
-  const inputClass = `w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${error ? "border-red-400" : "border-gray-300"}`;
+function ConfirmModal({ msg, onConfirm, onCancel }: any) {
   return (
-    <div className={className}>
-      {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-      {textarea ? (
-        <textarea value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={inputClass} rows={2} disabled={disabled} />
-      ) : (
-        <input type={type} value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={inputClass} disabled={disabled} />
-      )}
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
-    </div>
-  );
-}
-
-function SelectInput({ label, value, onChange, options, placeholder = "-- Chọn --", error, className = "" }: any) {
-  return (
-    <div className={className}>
-      {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-      <select value={value || ""} onChange={(e) => onChange(e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${error ? "border-red-400" : "border-gray-300"}`}>
-        <option value="">{placeholder}</option>
-        {options.map((o: any) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
-    </div>
-  );
-}
-
-function Badge({ color, children }: any) {
-  const colors: any = { 
-    green: "bg-green-100 text-green-700", 
-    orange: "bg-orange-100 text-orange-700", 
-    red: "bg-red-100 text-red-700", 
-    blue: "bg-blue-100 text-blue-700", 
-    gray: "bg-gray-100 text-gray-700" 
-  };
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${colors[color] || colors.gray}`}>{children}</span>;
-}
-
-function StatCard({ icon, title, value, subtitle, color }: any) {
-  const colors: any = { 
-    blue: "bg-blue-100 text-blue-600", 
-    green: "bg-green-100 text-green-600", 
-    orange: "bg-orange-100 text-orange-600", 
-    purple: "bg-purple-100 text-purple-600" 
-  };
-  return (
-    <div className="bg-white rounded-xl shadow-sm border p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-500 text-xs sm:text-sm">{title}</p>
-          <p className="text-xl sm:text-2xl font-bold mt-1">{value}</p>
-          {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40 p-4">
+      <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+        <div className="flex items-center gap-3 mb-4">
+          <AlertCircle className="w-6 h-6 text-red-500" />
+          <p className="font-semibold">{msg}</p>
         </div>
-        <div className={`p-2.5 rounded-xl ${colors[color] || ""}`}>{icon}</div>
+        <div className="flex gap-2">
+          <button onClick={onConfirm} className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
+            Xác nhận
+          </button>
+          <button onClick={onCancel} className="flex-1 bg-gray-200 py-2 rounded-lg hover:bg-gray-300">
+            Hủy
+          </button>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function FormInput({ label, type = "text", value, onChange, error, placeholder, textarea, className = "" }: any) {
+  const Tag: any = textarea ? "textarea" : "input";
+  return (
+    <div className={className}>
+      <label className="block text-sm font-medium mb-1.5 text-gray-700">{label}</label>
+      <Tag
+        type={type}
+        value={value}
+        onChange={(e: any) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`w-full px-3 py-2 border rounded-lg text-sm ${error ? "border-red-500" : "border-gray-300"} ${textarea ? "resize-none h-20" : ""}`}
+      />
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </div>
+  );
+}
+
+function SelectInput({ label, value, onChange, options, error }: any) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1.5 text-gray-700">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`w-full px-3 py-2 border rounded-lg text-sm ${error ? "border-red-500" : "border-gray-300"}`}
+      >
+        <option value="">-- Chọn --</option>
+        {options.map((o: any) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </div>
+  );
+}
+
+function Badge({ children, color = "blue" }: any) {
+  const colors: any = {
+    blue: "bg-blue-100 text-blue-700",
+    green: "bg-green-100 text-green-700",
+    orange: "bg-orange-100 text-orange-700",
+    red: "bg-red-100 text-red-700",
+    gray: "bg-gray-100 text-gray-700"
+  };
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors[color]}`}>{children}</span>;
+}
+
+function StatCard({ icon: Icon, label, value, color }: any) {
+  return (
+    <div className={`bg-gradient-to-br ${color} rounded-xl p-6 shadow-lg text-white`}>
+      <Icon className="w-8 h-8 mb-3 opacity-90" />
+      <p className="text-sm opacity-90 mb-1">{label}</p>
+      <p className="text-3xl font-bold">{value}</p>
     </div>
   );
 }
 
 function Pagination({ page, total, onChange }: any) {
-  const pages = Math.ceil(total / PAGE_SIZE);
-  if (pages <= 1) return null;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (totalPages <= 1) return null;
   return (
-    <div className="flex items-center justify-center gap-2 mt-4">
-      <button disabled={page <= 1} onClick={() => onChange(page - 1)} className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40 hover:bg-gray-50">‹</button>
-      <span className="text-sm text-gray-600">{page}/{pages}</span>
-      <button disabled={page >= pages} onClick={() => onChange(page + 1)} className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40 hover:bg-gray-50">›</button>
-    </div>
-  );
-}
-
-function ConfirmModal({ msg, onConfirm, onCancel }: any) {
-  return (
-    <Modal onClose={onCancel} title="Xác nhận">
-      <p className="text-sm text-gray-600 mb-4">{msg}</p>
-      <div className="flex gap-2">
-        <button onClick={onConfirm} className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-red-700">Xác nhận</button>
-        <button onClick={onCancel} className="flex-1 bg-gray-200 py-2 rounded-lg text-sm">Hủy</button>
-      </div>
-    </Modal>
-  );
-}
-
-// ===== MAIN APP =====
-export default function App() {
-  // Load saved session from localStorage
-  const savedSession = localStorage.getItem('autorent_session');
-  const initialSession = savedSession ? JSON.parse(savedSession) : null;
-  
-  const [isAuth, setIsAuth] = useState(!!initialSession);
-  const [user, setUser] = useState<any>(initialSession);
-  const [loginForm, setLoginForm] = useState({ u: "", p: "" });
-  const [loginError, setLoginError] = useState("");
-  const [tab, setTab] = useState("dashboard");
-  const [month, setMonth] = useState(new Date());
-  const [toast, setToast] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  
-  // Data states
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [rentals, setRentals] = useState<any[]>([]);
-  const [expenses, setExpenses] = useState<any[]>([]);
-  const [dataLoaded, setDataLoaded] = useState(false);
-
-  // Load all data from Supabase
-  const loadAll = useCallback(() => {
-    setLoading(true);
-    dbLoad('vehicles', (d: any) => setVehicles(d), 'created_at');
-    dbLoad('customers', (d: any) => setCustomers(d), 'created_at');
-    dbLoad('rentals', (d: any) => setRentals(d), 'created_at');
-    dbLoad('expenses', (d: any) => { 
-      setExpenses(d); 
-      setLoading(false); 
-      setDataLoaded(true); 
-    }, 'created_at');
-  }, []);
-
-  // Load data when authenticated
-  useEffect(() => {
-    if (isAuth && !dataLoaded) {
-      loadAll();
-    }
-  }, [isAuth, dataLoaded, loadAll]);
-
-  const notify = useCallback((msg: string, type = "success") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  }, []);
-
-  const hasPerm = useCallback((p: string) => user && (PERMISSIONS[user.role] || []).includes(p), [user]);
-  const canWrite = useCallback((p: string) => user && (WRITE_PERMS[p] || []).includes(user.role), [user]);
-
-  const vMap = useMemo(() => {
-    const m: any = {};
-    vehicles.forEach(v => m[v.id] = v);
-    return m;
-  }, [vehicles]);
-
-  const cMap = useMemo(() => {
-    const m: any = {};
-    customers.forEach(c => m[c.id] = c);
-    return m;
-  }, [customers]);
-
-  const vehicleName = useCallback((id: string) => (vMap[id] || {}).name || "", [vMap]);
-  const vehiclePlate = useCallback((id: string) => (vMap[id] || {}).plate || "", [vMap]);
-  const customerName = useCallback((id: string) => (cMap[id] || {}).name || "", [cMap]);
-  const customerPhone = useCallback((id: string) => (cMap[id] || {}).phone || "", [cMap]);
-
-  const checkOverlap = useCallback((vid: string, sd: string, ed: string, excludeId?: string) => {
-    return rentals.some(r => 
-      r.vehicle_id === vid && 
-      r.status === "active" && 
-      r.id !== excludeId && 
-      r.start_date <= ed && 
-      r.end_date >= sd
-    );
-  }, [rentals]);
-
-  const getVehicleStatus = useCallback((vid: string, date: string) => {
-    const rental = rentals.find(r => 
-      r.vehicle_id === vid && 
-      r.status === "active" && 
-      r.start_date <= date && 
-      r.end_date >= date
-    );
-    if (!rental) return { status: "available", time: null, rental: null };
-    return { status: "rented", time: date === rental.end_date ? rental.end_time : null, rental };
-  }, [rentals]);
-
-  const handleLogin = () => {
-    if (!loginForm.u || !loginForm.p) {
-      setLoginError("Vui lòng nhập đầy đủ");
-      return;
-    }
-    const passwords: any = { admin: "admin123", sale1: "sale123", manager: "manager123", accountant: "acc123" };
-    const foundUser = DEMO_USERS.find(u => u.username === loginForm.u);
-    if (!foundUser || passwords[loginForm.u] !== loginForm.p) {
-      setLoginError("Sai tên đăng nhập hoặc mật khẩu");
-      return;
-    }
-    
-    // Save session to localStorage
-    localStorage.setItem('autorent_session', JSON.stringify(foundUser));
-    
-    setUser(foundUser);
-    setIsAuth(true);
-    setLoginError("");
-  };
-
-  const handleLogout = () => {
-    // Clear session from localStorage
-    localStorage.removeItem('autorent_session');
-    
-    setIsAuth(false);
-    setUser(null);
-    setDataLoaded(false);
-  };
-
-  if (!isAuth) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-md">
-          <div className="text-center mb-6">
-            <Car className="w-14 h-14 text-blue-600 mx-auto mb-3" />
-            <h1 className="text-2xl font-bold">AutoRent Pro</h1>
-            <p className="text-gray-500 text-sm mt-1">Hệ thống quản lý cho thuê xe</p>
-          </div>
-          <div className="space-y-3">
-            <FormInput 
-              label="Tên đăng nhập" 
-              value={loginForm.u} 
-              onChange={(v: string) => setLoginForm({ ...loginForm, u: v })} 
-            />
-            <FormInput 
-              label="Mật khẩu" 
-              type="password" 
-              value={loginForm.p} 
-              onChange={(v: string) => setLoginForm({ ...loginForm, p: v })} 
-            />
-            {loginError && <p className="text-red-500 text-sm text-center">{loginError}</p>}
-            <button onClick={handleLogin} className="w-full bg-blue-600 text-white py-2.5 rounded-xl hover:bg-blue-700 font-semibold text-sm">
-              Đăng nhập
-            </button>
-          </div>
-          <div className="mt-5 p-3 bg-gray-50 rounded-xl text-xs text-gray-500 space-y-0.5">
-            <p className="font-semibold text-gray-600 mb-1">Demo:</p>
-            <p>• admin / admin123</p>
-            <p>• sale1 / sale123</p>
-            <p>• manager / manager123</p>
-            <p>• accountant / acc123</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const tabs = [
-    { k: "dashboard", icon: TrendingUp, label: "Tổng quan" },
-    { k: "vehicles", icon: Car, label: "Xe" },
-    { k: "rentals", icon: Calendar, label: "Hợp đồng" },
-    { k: "customers", icon: Users, label: "Khách hàng" },
-    { k: "expenses", icon: CreditCard, label: "Chi phí" },
-    { k: "calendar", icon: Clock, label: "Lịch" },
-  ].filter(t => hasPerm(t.k));
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Toast toast={toast} />
-      {loading && <Spinner />}
-      
-      <header className="bg-white shadow-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-2 min-w-0">
-            <Car className="w-7 h-7 text-blue-600 shrink-0" />
-            <div className="min-w-0">
-              <h1 className="text-lg font-bold truncate">AutoRent Pro</h1>
-              <p className="text-xs text-gray-500 truncate">
-                {user.name} <Badge color="blue">{ROLE_LABELS[user.role]}</Badge>
-              </p>
-            </div>
-          </div>
-          <button 
-            onClick={handleLogout} 
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm shrink-0"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Thoát</span>
-          </button>
-        </div>
-      </header>
-
-      <nav className="bg-white border-b sticky top-[52px] z-20">
-        <div className="max-w-7xl mx-auto px-1 sm:px-6">
-          <div className="flex overflow-x-auto py-1 gap-0.5">
-            {tabs.map(t => {
-              const Icon = t.icon;
-              const active = tab === t.k;
-              return (
-                <button 
-                  key={t.k} 
-                  onClick={() => setTab(t.k)} 
-                  className={`flex flex-col items-center px-2 py-1.5 rounded-lg whitespace-nowrap transition min-w-0 sm:flex-row sm:gap-2 sm:px-4 sm:py-3 ${active ? "bg-blue-50 text-blue-600 font-semibold" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
-                >
-                  <Icon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                  <span className="text-[10px] leading-tight mt-0.5 sm:hidden">{t.label}</span>
-                  <span className="text-[15px] hidden sm:inline">{t.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
-        {tab === "dashboard" && <DashboardTab vehicles={vehicles} rentals={rentals} expenses={expenses} customers={customers} customerName={customerName} vMap={vMap} />}
-        {tab === "vehicles" && <VehiclesTab vehicles={vehicles} setVehicles={setVehicles} rentals={rentals} getVehicleStatus={getVehicleStatus} month={month} notify={notify} canWrite={canWrite("vehicles")} />}
-        {tab === "rentals" && <RentalsTab vehicles={vehicles} setVehicles={setVehicles} customers={customers} rentals={rentals} setRentals={setRentals} checkOverlap={checkOverlap} notify={notify} setLoading={setLoading} customerName={customerName} customerPhone={customerPhone} vehicleName={vehicleName} vehiclePlate={vehiclePlate} vMap={vMap} canWrite={canWrite("rentals")} />}
-        {tab === "customers" && <CustomersTab customers={customers} setCustomers={setCustomers} rentals={rentals} vehicleName={vehicleName} notify={notify} canWrite={canWrite("customers")} />}
-        {tab === "expenses" && <ExpensesTab vehicles={vehicles} expenses={expenses} setExpenses={setExpenses} notify={notify} canWrite={canWrite("expenses")} vMap={vMap} />}
-        {tab === "calendar" && <CalendarTab vehicles={vehicles} getVehicleStatus={getVehicleStatus} customerName={customerName} month={month} setMonth={setMonth} notify={notify} currentUser={user} />}
-      </main>
+    <div className="flex justify-center gap-2 items-center">
+      <button
+        onClick={() => onChange(Math.max(1, page - 1))}
+        disabled={page === 1}
+        className="px-3 py-1.5 border rounded-lg disabled:opacity-50 text-sm"
+      >
+        ←
+      </button>
+      <span className="text-sm">Trang {page}/{totalPages}</span>
+      <button
+        onClick={() => onChange(Math.min(totalPages, page + 1))}
+        disabled={page === totalPages}
+        className="px-3 py-1.5 border rounded-lg disabled:opacity-50 text-sm"
+      >
+        →
+      </button>
     </div>
   );
 }
 
 // ===== TAB COMPONENTS =====
-function DashboardTab({ vehicles, rentals, expenses, customers, customerName, vMap }: any) {
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-
-  const filteredRentals = useMemo(() => {
-    return rentals.filter((r: any) => {
-      if (r.status === "cancelled") return false;
-      if (dateFrom && r.start_date < dateFrom) return false;
-      if (dateTo && r.start_date > dateTo) return false;
-      return true;
-    });
-  }, [rentals, dateFrom, dateTo]);
-
-  const filteredExpenses = useMemo(() => {
-    return expenses.filter((e: any) => {
-      if (dateFrom && e.date < dateFrom) return false;
-      if (dateTo && e.date > dateTo) return false;
-      return true;
-    });
-  }, [expenses, dateFrom, dateTo]);
-
-  const totalRevenue = filteredRentals.reduce((s: number, r: any) => s + r.total + (r.surcharge || 0), 0);
-  const totalExpense = filteredExpenses.reduce((s: number, e: any) => s + e.amount, 0);
-  const profit = totalRevenue - totalExpense;
-  const totalTrips = filteredRentals.length;
+function DashboardTab({ rentals, expenses, vehicles, customerName, vehicleName, dateRange, setDateRange }: any) {
+  const activeRentals = rentals.filter((r: any) => r.status === "active");
   
-  const filterLabel = (!dateFrom && !dateTo) ? "Toàn bộ" : (dateFrom || "...") + " → " + (dateTo || "...");
+  const filteredRentals = dateRange.from && dateRange.to 
+    ? rentals.filter((r: any) => r.start_date >= dateRange.from && r.start_date <= dateRange.to)
+    : rentals;
+  
+  const filteredExpenses = dateRange.from && dateRange.to
+    ? expenses.filter((e: any) => e.date >= dateRange.from && e.date <= dateRange.to)
+    : expenses;
+
+  const revenue = filteredRentals.reduce((s: number, r: any) => s + r.paid, 0);
+  const totalExpenses = filteredExpenses.reduce((s: number, e: any) => s + e.amount, 0);
+  const profit = revenue - totalExpenses;
 
   return (
-    <div className="space-y-5">
-      <div className="bg-white rounded-xl shadow-sm border p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Filter className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-600 font-medium">Lọc:</span>
-          <input 
-            type="date" 
-            value={dateFrom} 
-            onChange={(e) => setDateFrom(e.target.value)} 
-            className="px-3 py-1.5 border rounded-lg text-sm" 
-          />
-          <span className="text-gray-400">→</span>
-          <input 
-            type="date" 
-            value={dateTo} 
-            onChange={(e) => setDateTo(e.target.value)} 
-            className="px-3 py-1.5 border rounded-lg text-sm" 
-          />
-          {(dateFrom || dateTo) && (
-            <button 
-              onClick={() => { setDateFrom(""); setDateTo(""); }} 
-              className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
-            >
-              <X className="w-3 h-3" />Xóa lọc
-            </button>
-          )}
-          <span className="text-xs text-gray-400 ml-auto">{filterLabel}</span>
-        </div>
+    <div className="space-y-6">
+      <div className="flex flex-wrap gap-3 items-center">
+        <FormInput 
+          label="Từ ngày" 
+          type="date" 
+          value={dateRange.from} 
+          onChange={(v: string) => setDateRange({ ...dateRange, from: v })} 
+          className="w-40"
+        />
+        <FormInput 
+          label="Đến ngày" 
+          type="date" 
+          value={dateRange.to} 
+          onChange={(v: string) => setDateRange({ ...dateRange, to: v })} 
+          className="w-40"
+        />
+        <button 
+          onClick={() => setDateRange({ from: "", to: "" })} 
+          className="bg-gray-200 px-3 py-2 rounded-lg text-sm mt-6"
+        >
+          Xóa lọc
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon={<DollarSign className="w-5 h-5" />} title="Tổng doanh thu" value={formatNumber(totalRevenue) + "đ"} color="purple" />
-        <StatCard icon={<CreditCard className="w-5 h-5" />} title="Tổng chi phí" value={formatNumber(totalExpense) + "đ"} color="orange" />
-        <StatCard icon={<TrendingUp className="w-5 h-5" />} title="Lợi nhuận" value={formatNumber(profit) + "đ"} color={profit >= 0 ? "green" : "orange"} subtitle={profit >= 0 ? "Có lãi" : "Đang lỗ"} />
-        <StatCard icon={<Car className="w-5 h-5" />} title="Số chuyến" value={totalTrips} color="blue" subtitle={vehicles.length + " xe"} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon={DollarSign} label="Doanh thu" value={formatNumber(revenue) + "đ"} color="from-green-500 to-green-600" />
+        <StatCard icon={TrendingUp} label="Chi phí" value={formatNumber(totalExpenses) + "đ"} color="from-red-500 to-red-600" />
+        <StatCard icon={DollarSign} label="Lợi nhuận" value={formatNumber(profit) + "đ"} color="from-blue-500 to-blue-600" />
+        <StatCard icon={Car} label="Đang thuê" value={activeRentals.length} color="from-orange-500 to-orange-600" />
       </div>
-      
-      <div className="bg-white rounded-xl shadow-sm border p-4 sm:p-5">
-        <h3 className="font-semibold mb-3 text-sm flex items-center gap-2">
-          <Clock className="w-4 h-4 text-orange-500" />
-          Hợp đồng đang hoạt động
+
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <h3 className="font-bold mb-4 flex items-center gap-2">
+          <Calendar className="w-5 h-5" />
+          Hợp đồng đang hoạt động ({activeRentals.length})
         </h3>
         <div className="space-y-2">
-          {filteredRentals.filter((r: any) => r.status === "active").map((r: any) => {
-            const vehicle = vMap[r.vehicle_id];
-            return (
-              <div key={r.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-100">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-2xl shrink-0">{vehicle?.image || "🚗"}</span>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm truncate">{customerName(r.customer_id)}</p>
-                    <p className="text-xs text-gray-500 truncate">{vehicle?.name}</p>
-                    <p className="text-xs text-gray-400">
-                      {formatDate(r.start_date)} → {formatDate(r.end_date)}
-                    </p>
-                  </div>
-                </div>
-                <Badge color="orange">Đang thuê</Badge>
+          {activeRentals.map((r: any) => (
+            <div key={r.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-medium text-sm">{vehicleName(r.vehicle_id)}</p>
+                <p className="text-xs text-gray-500">{customerName(r.customer_id)}</p>
               </div>
-            );
-          })}
-          {filteredRentals.filter((r: any) => r.status === "active").length === 0 && (
-            <p className="text-center text-gray-400 py-6 text-sm">Không có hợp đồng nào đang hoạt động</p>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">{formatDate(r.start_date)} → {formatDate(r.end_date)}</p>
+                <p className="text-sm font-semibold text-green-600">{formatNumber(r.total)}đ</p>
+              </div>
+            </div>
+          ))}
+          {activeRentals.length === 0 && (
+            <p className="text-center text-gray-400 py-4 text-sm">Không có hợp đồng nào đang hoạt động</p>
           )}
         </div>
       </div>
@@ -526,50 +296,45 @@ function DashboardTab({ vehicles, rentals, expenses, customers, customerName, vM
   );
 }
 
-function VehiclesTab({ vehicles, setVehicles, rentals, canWrite, notify }: any) {
+function VehiclesTab({ vehicles, setVehicles, rentals, notify, setLoading, canWrite }: any) {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
+  const [editingVehicle, setEditingVehicle] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<any>(null);
-  const emptyForm = { name: "", plate: "", odo: "0", price_day: "", price_week: "", price_month: "", type: "Sedan", seats: "5", transmission: "Tự động", fuel: "Xăng", image: "🚗" };
+  const emptyForm = { name: "", plate: "", price_day: "", price_week: "", price_month: "", image: "🚗", type: "Sedan", seats: "5", transmission: "Tự động", fuel: "Xăng", odo: "0" };
   const [form, setForm] = useState<any>({ ...emptyForm });
   const [errors, setErrors] = useState<any>({});
-  
-  const filtered = vehicles.filter((v: any) => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    return v.name.toLowerCase().includes(s) || v.plate.toLowerCase().includes(s);
-  });
 
   const addVehicle = () => {
     const e: any = {};
     if (!form.name.trim()) e.name = "Bắt buộc";
     if (!form.plate) e.plate = "Bắt buộc";
-    else if (!/^\d{2}[A-Z]-\d{4,5}$/.test(form.plate.toUpperCase())) e.plate = "Sai (VD: 30A-12345)";
+    else if (!/^\d{2}[A-Z]-\d{4,5}$/.test(form.plate.toUpperCase())) e.plate = "Sai định dạng (VD: 30A-12345)";
     else if (vehicles.some((v: any) => v.plate === form.plate.toUpperCase())) e.plate = "Đã tồn tại";
-    if (!form.price_day || parseInt(form.price_day) <= 0) e.price_day = "Phải > 0";
+    if (!form.price_day || parseInt(form.price_day) <= 0) e.price_day = "> 0";
+    if (parseInt(form.odo) < 0) e.odo = "≥ 0";
     setErrors(e);
     if (Object.keys(e).length) return;
 
-    const pd = parseInt(form.price_day);
-    const row = {
-      name: form.name.trim(),
+    const newVehicle = {
+      name: form.name,
       plate: form.plate.toUpperCase(),
-      image: form.image,
-      price_day: pd,
-      price_week: parseInt(form.price_week) || pd * 6,
-      price_month: parseInt(form.price_month) || pd * 25,
-      odo: Math.max(0, parseInt(form.odo) || 0),
+      price_day: parseInt(form.price_day),
+      price_week: parseInt(form.price_week) || parseInt(form.price_day) * 6,
+      price_month: parseInt(form.price_month) || parseInt(form.price_day) * 25,
+      odo: parseInt(form.odo) || 0,
       type: form.type,
-      seats: parseInt(form.seats) || 5,
+      seats: parseInt(form.seats),
       transmission: form.transmission,
       fuel: form.fuel,
+      image: form.image,
       status: "available"
     };
 
-    dbInsert('vehicles', row, (nv: any) => {
+    dbInsert('vehicles', newVehicle, (nv: any) => {
       if (nv) {
-        setVehicles((prev: any) => [...prev, nv]);
+        setVehicles((prev: any) => [nv, ...prev]);
         setForm({ ...emptyForm });
         setShowAdd(false);
         setErrors({});
@@ -578,69 +343,80 @@ function VehiclesTab({ vehicles, setVehicles, rentals, canWrite, notify }: any) 
     });
   };
 
-  const saveEdit = () => {
-    if (!editing.name.trim()) {
-      notify("Tên xe bắt buộc", "error");
+  const updateVehicle = (id: string) => {
+    if (!editingVehicle.name || !editingVehicle.plate) {
+      notify("❌ Vui lòng điền đầy đủ!", "error");
       return;
     }
-    const old = vehicles.find((v: any) => v.id === editing.id);
-    if (parseInt(editing.odo) < old.odo) {
-      notify("ODO không thể giảm!", "error");
+    const oldVehicle = vehicles.find((v: any) => v.id === id);
+    if (parseInt(editingVehicle.odo) < oldVehicle.odo) {
+      notify(`❌ ODO không thể giảm! Hiện tại: ${formatNumber(oldVehicle.odo)}km`, "error");
       return;
     }
 
-    const data = {
-      name: editing.name,
-      odo: parseInt(editing.odo),
-      price_day: parseInt(editing.price_day),
-      price_week: parseInt(editing.price_week),
-      price_month: parseInt(editing.price_month)
+    const updates = {
+      name: editingVehicle.name,
+      plate: editingVehicle.plate,
+      price_day: parseInt(editingVehicle.price_day),
+      price_week: parseInt(editingVehicle.price_week),
+      price_month: parseInt(editingVehicle.price_month),
+      odo: parseInt(editingVehicle.odo)
     };
 
-    dbUpdate('vehicles', editing.id, data, (uv: any) => {
+    dbUpdate('vehicles', id, updates, (uv: any) => {
       if (uv) {
-        setVehicles((prev: any) => prev.map((v: any) => v.id === editing.id ? { ...v, ...uv } : v));
-        setEditing(null);
+        setVehicles((prev: any) => prev.map((v: any) => v.id === id ? { ...v, ...uv } : v));
+        setEditingVehicle(null);
         notify("✅ Cập nhật thành công!");
       }
     });
   };
 
-  const doDelete = () => {
-    const v = deleteConfirm;
-    
-    // Check if vehicle has active rentals
-    const hasActiveRentals = rentals.some((r: any) => r.vehicle_id === v.id && r.status === "active");
+  const deleteVehicle = (vehicle: any) => {
+    const hasActiveRentals = rentals.some((r: any) => r.vehicle_id === vehicle.id && r.status === "active");
     if (hasActiveRentals) {
-      notify("❌ Không thể xóa xe đang có hợp đồng!", "error");
-      setDeleteConfirm(null);
+      notify("❌ Xe đang có hợp đồng, không thể xóa!", "error");
       return;
     }
+    setDeleteConfirm(vehicle);
+  };
 
-    dbDelete('vehicles', v.id, (ok: boolean) => {
+  const confirmDelete = () => {
+    if (!deleteConfirm) return;
+    setLoading(true);
+    dbDelete('vehicles', deleteConfirm.id, (ok: boolean) => {
       if (ok) {
-        setVehicles((prev: any) => prev.filter((x: any) => x.id !== v.id));
-        notify("✅ Đã xóa xe " + v.name);
+        setVehicles((prev: any) => prev.filter((v: any) => v.id !== deleteConfirm.id));
+        notify("✅ Đã xóa xe!");
       }
       setDeleteConfirm(null);
+      setLoading(false);
     });
   };
+
+  const filtered = vehicles.filter((v: any) => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return v.name.toLowerCase().includes(s) || v.plate.toLowerCase().includes(s);
+  });
+
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap justify-between items-center gap-2">
-        <h2 className="text-xl font-bold">Xe ({vehicles.length})</h2>
+        <h2 className="text-xl font-bold">Quản lý xe ({vehicles.length})</h2>
         <div className="flex gap-2 items-center">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-400" />
             <input 
               value={search} 
-              onChange={(e) => setSearch(e.target.value)} 
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }} 
               placeholder="Tìm xe..." 
-              className="pl-8 pr-3 py-2 border rounded-lg text-sm w-40" 
+              className="pl-8 pr-3 py-2 border rounded-lg text-sm w-36" 
             />
           </div>
-          {canWrite && (
+          {canWrite("vehicles") && (
             <button 
               onClick={() => setShowAdd(true)} 
               className="bg-blue-600 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 hover:bg-blue-700 text-sm"
@@ -655,108 +431,103 @@ function VehiclesTab({ vehicles, setVehicles, rentals, canWrite, notify }: any) 
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <h3 className="font-semibold mb-3 text-sm">Thêm xe mới</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FormInput label="Tên xe *" value={form.name} onChange={(v: string) => setForm({ ...form, name: v })} error={errors.name} />
+            <FormInput label="Tên xe *" value={form.name} onChange={(v: string) => setForm({ ...form, name: v })} error={errors.name} placeholder="Toyota Camry 2024" />
             <FormInput label="Biển số *" value={form.plate} onChange={(v: string) => setForm({ ...form, plate: v.toUpperCase() })} error={errors.plate} placeholder="30A-12345" />
-            <FormInput label="Giá/ngày *" type="number" value={form.price_day} onChange={(v: string) => setForm({ ...form, price_day: v })} error={errors.price_day} />
+            <FormInput label="ODO (km)" type="number" value={form.odo} onChange={(v: string) => setForm({ ...form, odo: v })} error={errors.odo} />
+            <FormInput label="Giá/ngày *" type="number" value={form.price_day} onChange={(v: string) => setForm({ ...form, price_day: v })} error={errors.price_day} placeholder="800000" />
             <FormInput label="Giá/tuần" type="number" value={form.price_week} onChange={(v: string) => setForm({ ...form, price_week: v })} placeholder="Tự tính" />
             <FormInput label="Giá/tháng" type="number" value={form.price_month} onChange={(v: string) => setForm({ ...form, price_month: v })} placeholder="Tự tính" />
-            <FormInput label="ODO (km)" type="number" value={form.odo} onChange={(v: string) => setForm({ ...form, odo: v })} />
+            <SelectInput label="Loại xe" value={form.type} onChange={(v: string) => setForm({ ...form, type: v })} options={[{value:"Sedan",label:"Sedan"},{value:"SUV",label:"SUV"},{value:"MPV",label:"MPV"},{value:"Pickup",label:"Pickup"}]} />
+            <FormInput label="Số chỗ" type="number" value={form.seats} onChange={(v: string) => setForm({ ...form, seats: v })} />
+            <SelectInput label="Hộp số" value={form.transmission} onChange={(v: string) => setForm({ ...form, transmission: v })} options={[{value:"Tự động",label:"Tự động"},{value:"Số sàn",label:"Số sàn"}]} />
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={addVehicle} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 flex items-center gap-1.5">
+            <button onClick={addVehicle} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 flex items-center gap-1.5">
               <Save className="w-4 h-4" />Lưu
             </button>
             <button onClick={() => { setShowAdd(false); setErrors({}); }} className="bg-gray-200 px-4 py-2 rounded-lg text-sm">Hủy</button>
           </div>
         </div>
       )}
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        {filtered.map((v: any) => {
-          const isEditing = editing && editing.id === v.id;
-          
-          if (isEditing) {
-            return (
-              <div key={v.id} className="bg-white rounded-xl shadow-sm border p-4">
-                <div className="space-y-2">
-                  <FormInput label="Tên xe" value={editing.name} onChange={(val: string) => setEditing({ ...editing, name: val })} />
-                  <FormInput label={"ODO ≥ " + formatNumber(v.odo)} type="number" value={String(editing.odo)} onChange={(val: string) => setEditing({ ...editing, odo: val })} />
-                  <FormInput label="Giá/ngày" type="number" value={String(editing.price_day)} onChange={(val: string) => setEditing({ ...editing, price_day: val })} />
-                  <div className="flex gap-2 pt-1">
-                    <button onClick={saveEdit} className="flex-1 bg-green-600 text-white py-1.5 rounded-lg text-sm">Lưu</button>
-                    <button onClick={() => setEditing(null)} className="flex-1 bg-gray-200 py-1.5 rounded-lg text-sm">Hủy</button>
-                  </div>
-                </div>
-              </div>
-            );
-          }
 
-          const statusColor = v.status === "available" ? "green" : v.status === "rented" ? "orange" : "red";
-          const statusText = v.status === "available" ? "Sẵn sàng" : v.status === "rented" ? "Đang thuê" : "Bảo trì";
-          
-          return (
-            <div key={v.id} className="bg-white rounded-xl shadow-sm border p-4 hover:shadow-md transition">
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-3xl">{v.image}</span>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-sm truncate">{v.name}</h3>
-                    <p className="text-gray-500 text-xs">{v.plate}</p>
-                  </div>
-                </div>
-                <Badge color={statusColor}>{statusText}</Badge>
-              </div>
-              
-              <div className="space-y-1 text-sm mb-3 pb-3 border-b">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">ODO:</span>
-                  <span className="font-medium">{formatNumber(v.odo)} km</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Ngày:</span>
-                  <span className="font-medium text-blue-600">{formatNumber(v.price_day)}đ</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tuần:</span>
-                  <span className="font-medium text-green-600">{formatNumber(v.price_week)}đ</span>
-                </div>
-              </div>
-
-              {canWrite && (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {paginated.map((v: any) => (
+          <div key={v.id} className="bg-white rounded-xl shadow-sm border p-4 hover:shadow-lg transition">
+            {editingVehicle?.id === v.id ? (
+              <div className="space-y-3">
+                <FormInput label="Tên" value={editingVehicle.name} onChange={(val: string) => setEditingVehicle({...editingVehicle, name: val})} />
+                <FormInput label={`ODO (≥${formatNumber(v.odo)})`} type="number" value={editingVehicle.odo} onChange={(val: string) => setEditingVehicle({...editingVehicle, odo: val})} />
+                <FormInput label="Giá/ngày" type="number" value={editingVehicle.price_day} onChange={(val: string) => setEditingVehicle({...editingVehicle, price_day: val})} />
+                <FormInput label="Giá/tuần" type="number" value={editingVehicle.price_week} onChange={(val: string) => setEditingVehicle({...editingVehicle, price_week: val})} />
+                <FormInput label="Giá/tháng" type="number" value={editingVehicle.price_month} onChange={(val: string) => setEditingVehicle({...editingVehicle, price_month: val})} />
                 <div className="flex gap-2">
-                  <button 
-                    onClick={() => setEditing({ ...v })} 
-                    className="flex-1 bg-blue-50 text-blue-600 py-1.5 rounded-lg text-xs hover:bg-blue-100 flex items-center justify-center gap-1"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />Sửa
+                  <button onClick={() => updateVehicle(v.id)} className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm flex items-center justify-center gap-1">
+                    <Save className="w-4 h-4" />Lưu
                   </button>
-                  <button 
-                    onClick={() => setDeleteConfirm(v)} 
-                    className="flex-1 bg-red-50 text-red-500 py-1.5 rounded-lg text-xs hover:bg-red-100 flex items-center justify-center gap-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />Xóa
-                  </button>
+                  <button onClick={() => setEditingVehicle(null)} className="flex-1 bg-gray-200 py-2 rounded-lg text-sm">Hủy</button>
                 </div>
-              )}
-            </div>
-          );
-        })}
-        
-        {filtered.length === 0 && (
-          <div className="col-span-full text-center py-10 text-gray-400 text-sm">Không tìm thấy xe</div>
-        )}
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-4xl">{v.image}</span>
+                    <div>
+                      <h3 className="font-semibold text-lg">{v.name}</h3>
+                      <p className="text-gray-600 text-sm">{v.plate}</p>
+                    </div>
+                  </div>
+                  <Badge color={v.status === "available" ? "green" : v.status === "rented" ? "orange" : "red"}>
+                    {v.status === "available" ? "✅ Sẵn" : v.status === "rented" ? "🔄 Thuê" : "🔧 Bảo trì"}
+                  </Badge>
+                </div>
+                <div className="space-y-2 text-sm mb-4 pb-4 border-b">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">ODO:</span>
+                    <span className="font-medium">{formatNumber(v.odo)} km</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Giá/ngày:</span>
+                    <span className="font-medium text-blue-600">{formatNumber(v.price_day)}đ</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Giá/tuần:</span>
+                    <span className="font-medium text-green-600">{formatNumber(v.price_week)}đ</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Giá/tháng:</span>
+                    <span className="font-medium text-purple-600">{formatNumber(v.price_month)}đ</span>
+                  </div>
+                </div>
+                {canWrite("vehicles") && (
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditingVehicle(v)} className="flex-1 bg-blue-100 text-blue-700 py-2 rounded-lg text-sm hover:bg-blue-200 flex items-center justify-center gap-1">
+                      <Edit className="w-4 h-4" />Sửa
+                    </button>
+                    <button onClick={() => deleteVehicle(v)} className="flex-1 bg-red-100 text-red-700 py-2 rounded-lg text-sm hover:bg-red-200 flex items-center justify-center gap-1">
+                      <Trash2 className="w-4 h-4" />Xóa
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
       </div>
+
+      <Pagination page={page} total={filtered.length} onChange={setPage} />
 
       {deleteConfirm && (
         <ConfirmModal 
-          msg={`Xóa xe ${deleteConfirm.name} (${deleteConfirm.plate})? Không thể hoàn tác.`} 
-          onConfirm={doDelete} 
+          msg={`Xóa xe ${deleteConfirm.name}?`} 
+          onConfirm={confirmDelete} 
           onCancel={() => setDeleteConfirm(null)} 
         />
       )}
     </div>
   );
 }
+
 function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, checkOverlap, notify, setLoading, customerName, vehicleName, vehiclePlate, vMap, canWrite }: any) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -899,7 +670,7 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
               className="pl-8 pr-3 py-2 border rounded-lg text-sm w-36" 
             />
           </div>
-          {canWrite && (
+          {canWrite("rentals") && (
             <button 
               onClick={() => setShowAdd(true)} 
               className="bg-green-600 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 hover:bg-green-700 text-sm"
@@ -980,7 +751,7 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
                       <Badge color={statusColor}>{statusText}</Badge>
                     </td>
                     <td className="px-3 py-2.5">
-                      {r.status === "active" && canWrite && (
+                      {r.status === "active" && canWrite("rentals") && (
                         <button 
                           onClick={() => { setReturnModal(r); setReturnForm({ odo_end: String(r.odo_start), surcharge: "0", surcharge_note: "" }); }} 
                           className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 flex items-center gap-1"
@@ -1067,7 +838,6 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
     </div>
   );
 }
-
 function CustomersTab({ customers, setCustomers, rentals, vehicleName, notify, canWrite }: any) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -1120,7 +890,7 @@ function CustomersTab({ customers, setCustomers, rentals, vehicleName, notify, c
               className="pl-8 pr-3 py-2 border rounded-lg text-sm w-44" 
             />
           </div>
-          {canWrite && (
+          {canWrite("customers") && (
             <button 
               onClick={() => setShowAdd(true)} 
               className="bg-green-600 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 hover:bg-green-700 text-sm"
@@ -1288,7 +1058,7 @@ function ExpensesTab({ expenses, setExpenses, vehicles, vMap, notify, canWrite }
             <option value="all">Tất cả</option>
             {EXP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          {canWrite && (
+          {canWrite("expenses") && (
             <button 
               onClick={() => setShowAdd(true)} 
               className="bg-red-600 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 hover:bg-red-700 text-sm"
@@ -1352,7 +1122,7 @@ function ExpensesTab({ expenses, setExpenses, vehicles, vMap, notify, canWrite }
                       -{formatNumber(e.amount)}đ
                     </td>
                     <td className="px-3 py-2.5">
-                      {canWrite && (
+                      {canWrite("expenses") && (
                         <button 
                           onClick={() => setDeleteConfirm(e)} 
                           className="text-red-400 hover:text-red-600"
@@ -1391,7 +1161,7 @@ function ExpensesTab({ expenses, setExpenses, vehicles, vMap, notify, canWrite }
   );
 }
 
-function CalendarTab({ vehicles, getVehicleStatus, customerName, month, setMonth, notify, currentUser }: any) {
+function CalendarTab({ vehicles, getVehicleStatus, customerName, month, setMonth, notify }: any) {
   const year = month.getFullYear();
   const monthNum = month.getMonth();
   const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
@@ -1500,7 +1270,9 @@ function CalendarTab({ vehicles, getVehicleStatus, customerName, month, setMonth
       ))}
     </div>
   );
-  // ===== PUBLIC BOOKING VIEW (Không cần đăng nhập) =====
+}
+
+// ===== PUBLIC BOOKING VIEW (NO LOGIN) =====
 function PublicBookingView({ vehicles, rentals, getVehicleStatus, customerName, month, setMonth }: any) {
   const year = month.getFullYear();
   const monthNum = month.getMonth();
@@ -1679,4 +1451,318 @@ function PublicBookingView({ vehicles, rentals, getVehicleStatus, customerName, 
     </div>
   );
 }
+
+// ===== MAIN APP COMPONENT =====
+export default function App() {
+  const savedSession = localStorage.getItem('autorent_session');
+  const initialSession = savedSession ? JSON.parse(savedSession) : null;
+  
+  const [showBookingView, setShowBookingView] = useState(false);
+  const [isAuth, setIsAuth] = useState(!!initialSession);
+  const [user, setUser] = useState<any>(initialSession);
+  const [loginForm, setLoginForm] = useState({ u: "", p: "" });
+  const [loginError, setLoginError] = useState("");
+  const [tab, setTab] = useState("dashboard");
+  const [month, setMonth] = useState(new Date());
+  const [toast, setToast] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [dateRange, setDateRange] = useState({ from: "", to: "" });
+  
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [rentals, setRentals] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('view') === 'booking') {
+      setShowBookingView(true);
+      loadAll();
+    }
+  }, []);
+
+  const loadAll = useCallback(() => {
+    setLoading(true);
+    dbLoad('vehicles', (d: any) => setVehicles(d), 'created_at');
+    dbLoad('customers', (d: any) => setCustomers(d), 'created_at');
+    dbLoad('rentals', (d: any) => setRentals(d), 'created_at');
+    dbLoad('expenses', (d: any) => { 
+      setExpenses(d); 
+      setLoading(false); 
+      setDataLoaded(true); 
+    }, 'created_at');
+  }, []);
+
+  useEffect(() => {
+    if (isAuth && !dataLoaded && !showBookingView) {
+      loadAll();
+    }
+  }, [isAuth, dataLoaded, loadAll, showBookingView]);
+
+  const notify = useCallback((msg: string, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  const hasPerm = useCallback((p: string) => user && (PERMISSIONS[user.role] || []).includes(p), [user]);
+  const canWrite = useCallback((p: string) => user && (WRITE_PERMS[p] || []).includes(user.role), [user]);
+
+  const vMap = useMemo(() => {
+    const m: any = {};
+    vehicles.forEach(v => m[v.id] = v);
+    return m;
+  }, [vehicles]);
+
+  const cMap = useMemo(() => {
+    const m: any = {};
+    customers.forEach(c => m[c.id] = c);
+    return m;
+  }, [customers]);
+
+  const vehicleName = useCallback((id: string) => (vMap[id] || {}).name || "", [vMap]);
+  const vehiclePlate = useCallback((id: string) => (vMap[id] || {}).plate || "", [vMap]);
+  const customerName = useCallback((id: string) => (cMap[id] || {}).name || "", [cMap]);
+
+  const checkOverlap = useCallback((vid: string, sd: string, ed: string, excludeId?: string) => {
+    return rentals.some(r => 
+      r.vehicle_id === vid && 
+      r.status === "active" && 
+      r.id !== excludeId && 
+      r.start_date <= ed && 
+      r.end_date >= sd
+    );
+  }, [rentals]);
+
+  const getVehicleStatus = useCallback((vid: string, date: string) => {
+    const rental = rentals.find(r => 
+      r.vehicle_id === vid && 
+      r.status === "active" && 
+      r.start_date <= date && 
+      r.end_date >= date
+    );
+    if (!rental) return { status: "available", time: null, rental: null };
+    return { status: "rented", time: date === rental.end_date ? rental.end_time : null, rental };
+  }, [rentals]);
+
+  const handleLogin = () => {
+    if (!loginForm.u || !loginForm.p) {
+      setLoginError("Vui lòng nhập đầy đủ");
+      return;
+    }
+    const passwords: any = { admin: "admin123", sale1: "sale123", manager: "manager123", accountant: "acc123" };
+    const foundUser = DEMO_USERS.find(u => u.username === loginForm.u);
+    if (!foundUser || passwords[loginForm.u] !== loginForm.p) {
+      setLoginError("Sai tên đăng nhập hoặc mật khẩu");
+      return;
+    }
+    
+    localStorage.setItem('autorent_session', JSON.stringify(foundUser));
+    setUser(foundUser);
+    setIsAuth(true);
+    setLoginError("");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('autorent_session');
+    setIsAuth(false);
+    setUser(null);
+    setDataLoaded(false);
+  };
+
+  if (showBookingView) {
+    return (
+      <>
+        <Toast toast={toast} />
+        {loading && <Spinner />}
+        <PublicBookingView 
+          vehicles={vehicles} 
+          rentals={rentals} 
+          getVehicleStatus={getVehicleStatus} 
+          customerName={customerName} 
+          month={month} 
+          setMonth={setMonth}
+        />
+      </>
+    );
+  }
+
+  if (!isAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+              <Car className="w-8 h-8 text-blue-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800">AutoRent Pro</h1>
+            <p className="text-gray-500 mt-2">Quản lý cho thuê xe</p>
+          </div>
+          
+          <div className="space-y-4">
+            <FormInput 
+              label="Tên đăng nhập" 
+              value={loginForm.u} 
+              onChange={(v: string) => setLoginForm({ ...loginForm, u: v })} 
+              placeholder="admin / sale1 / manager / accountant"
+            />
+            <FormInput 
+              label="Mật khẩu" 
+              type="password" 
+              value={loginForm.p} 
+              onChange={(v: string) => setLoginForm({ ...loginForm, p: v })} 
+              placeholder="••••••"
+            />
+            {loginError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm">
+                {loginError}
+              </div>
+            )}
+            <button 
+              onClick={handleLogin} 
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+            >
+              Đăng nhập
+            </button>
+          </div>
+          
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg text-xs text-gray-600">
+            <p className="font-semibold mb-2">Tài khoản demo:</p>
+            <p>• admin / admin123 (Full quyền)</p>
+            <p>• manager / manager123 (Quản lý)</p>
+            <p>• sale1 / sale123 (Nhân viên)</p>
+            <p>• accountant / acc123 (Kế toán)</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const tabs = [
+    { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard, perm: "dashboard" },
+    { id: "vehicles", label: "Xe", icon: Car, perm: "vehicles" },
+    { id: "rentals", label: "Hợp đồng", icon: DollarSign, perm: "rentals" },
+    { id: "customers", label: "Khách hàng", icon: Users, perm: "customers" },
+    { id: "expenses", label: "Chi phí", icon: Wrench, perm: "expenses" },
+    { id: "calendar", label: "Lịch", icon: Calendar, perm: "calendar" }
+  ].filter(t => hasPerm(t.perm));
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Toast toast={toast} />
+      {loading && <Spinner />}
+      
+      <header className="bg-white border-b sticky top-0 z-30 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <Car className="w-7 h-7 text-blue-600" />
+            <h1 className="text-xl font-bold">AutoRent Pro</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-600 hidden sm:inline">{user.name}</span>
+            <button 
+              onClick={handleLogout} 
+              className="flex items-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Đăng xuất</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm whitespace-nowrap transition ${
+                tab === t.id 
+                  ? "bg-blue-600 text-white shadow-lg" 
+                  : "bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              <t.icon className="w-4 h-4" />
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "dashboard" && (
+          <DashboardTab 
+            rentals={rentals} 
+            expenses={expenses} 
+            vehicles={vehicles}
+            customerName={customerName} 
+            vehicleName={vehicleName}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+          />
+        )}
+        
+        {tab === "vehicles" && (
+          <VehiclesTab 
+            vehicles={vehicles} 
+            setVehicles={setVehicles}
+            rentals={rentals}
+            notify={notify}
+            setLoading={setLoading}
+            canWrite={canWrite}
+          />
+        )}
+        
+        {tab === "rentals" && (
+          <RentalsTab 
+            rentals={rentals}
+            vehicles={vehicles}
+            setVehicles={setVehicles}
+            setRentals={setRentals}
+            customers={customers}
+            checkOverlap={checkOverlap}
+            notify={notify}
+            setLoading={setLoading}
+            customerName={customerName}
+            vehicleName={vehicleName}
+            vehiclePlate={vehiclePlate}
+            vMap={vMap}
+            canWrite={canWrite}
+          />
+        )}
+        
+        {tab === "customers" && (
+          <CustomersTab 
+            customers={customers}
+            setCustomers={setCustomers}
+            rentals={rentals}
+            vehicleName={vehicleName}
+            notify={notify}
+            canWrite={canWrite}
+          />
+        )}
+        
+        {tab === "expenses" && (
+          <ExpensesTab 
+            expenses={expenses}
+            setExpenses={setExpenses}
+            vehicles={vehicles}
+            vMap={vMap}
+            notify={notify}
+            canWrite={canWrite}
+          />
+        )}
+        
+        {tab === "calendar" && (
+          <CalendarTab 
+            vehicles={vehicles} 
+            getVehicleStatus={getVehicleStatus} 
+            customerName={customerName}
+            month={month}
+            setMonth={setMonth}
+            notify={notify}
+          />
+        )}
+      </div>
+    </div>
+  );
 }
