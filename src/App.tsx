@@ -1500,4 +1500,183 @@ function CalendarTab({ vehicles, getVehicleStatus, customerName, month, setMonth
       ))}
     </div>
   );
+  // ===== PUBLIC BOOKING VIEW (Không cần đăng nhập) =====
+function PublicBookingView({ vehicles, rentals, getVehicleStatus, customerName, month, setMonth }: any) {
+  const year = month.getFullYear();
+  const monthNum = month.getMonth();
+  const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
+  const startDay = new Date(year, monthNum, 1).getDay();
+  const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+  const today = todayString();
+  const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+  const [selectedDate, setSelectedDate] = useState<any>(null);
+  const contactPhone = "0819546586";
+  const contactName = "AutoRent";
+  
+  const empties = Array.from({ length: startDay }, (_, i) => i);
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const handleDateClick = (vehicle: any, dateStr: string, status: any) => {
+    if (status.status === "available") {
+      setSelectedVehicle(vehicle);
+      setSelectedDate(dateStr);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+      <header className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-8 sm:py-12">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center gap-4">
+            <Car className="w-10 h-10 sm:w-12 sm:h-12" />
+            <div>
+              <h1 className="text-2xl sm:text-4xl font-bold mb-2">🚗 AutoRent - Đặt xe nhanh chóng</h1>
+              <p className="text-blue-100 text-sm sm:text-lg">Chọn ngày trống để xem giá và đặt xe ngay</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
+        <div className="flex items-center justify-center gap-4 mb-6 bg-white rounded-xl shadow-lg p-4">
+          <button 
+            onClick={() => setMonth(new Date(year, monthNum - 1, 1))} 
+            className="p-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+          >
+            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">Tháng {monthNum + 1}/{year}</h2>
+          <button 
+            onClick={() => setMonth(new Date(year, monthNum + 1, 1))} 
+            className="p-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+          >
+            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+        </div>
+
+        <div className="space-y-6 sm:space-y-8">
+          {vehicles.filter((v: any) => v.status !== 'maintenance').map((vehicle: any) => (
+            <div key={vehicle.id} className="bg-white rounded-2xl shadow-xl p-4 sm:p-8 hover:shadow-2xl transition">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 pb-6 border-b-2 border-gray-100 gap-4">
+                <div className="flex items-center gap-4">
+                  <span className="text-4xl sm:text-6xl">{vehicle.image}</span>
+                  <div>
+                    <h3 className="text-2xl sm:text-3xl font-bold text-gray-800">{vehicle.name}</h3>
+                    <p className="text-gray-600 text-sm sm:text-lg">{vehicle.plate} • {vehicle.type} • {vehicle.seats} chỗ</p>
+                  </div>
+                </div>
+                <div className="text-left sm:text-right">
+                  <p className="text-xs sm:text-sm text-gray-600 mb-1">Giá từ</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-blue-600">{formatNumber(vehicle.price_day)}đ/ngày</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 gap-2 sm:gap-3">
+                {dayNames.map(day => (
+                  <div key={day} className="text-center font-bold text-gray-700 py-2 text-xs sm:text-lg">
+                    {day}
+                  </div>
+                ))}
+                
+                {empties.map(i => <div key={`empty-${i}`} />)}
+                
+                {days.map(day => {
+                  const dateStr = `${year}-${String(monthNum + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                  const status = getVehicleStatus(vehicle.id, dateStr);
+                  const isToday = dateStr === today;
+                  const isPast = dateStr < today;
+                  
+                  return (
+                    <button
+                      key={day}
+                      onClick={() => handleDateClick(vehicle, dateStr, status)}
+                      disabled={status.status === 'rented' || isPast}
+                      className={`border-2 rounded-xl p-2 sm:p-4 min-h-[60px] sm:min-h-[110px] transition-all ${
+                        isToday ? 'border-blue-600 border-4' : 'border-gray-200'
+                      } ${
+                        isPast ? 'bg-gray-100 cursor-not-allowed opacity-50' :
+                        status.status === 'available' ? 'bg-green-50 hover:bg-green-100 hover:scale-105 cursor-pointer shadow-md hover:shadow-xl' : 
+                        'bg-red-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <p className="text-lg sm:text-2xl font-bold mb-1 sm:mb-2 text-gray-800">{day}</p>
+                      <p className={`text-xs sm:text-sm font-bold ${
+                        isPast ? 'text-gray-500' :
+                        status.status === 'available' ? 'text-green-700' : 'text-red-700'
+                      }`}>
+                        {isPast ? '⏮️' : status.status === 'available' ? '✅ Trống' : '🔄 Thuê'}
+                      </p>
+                      {status.time && !isPast && (
+                        <p className="text-[10px] sm:text-xs text-orange-600 font-bold mt-1">
+                          Trả: {status.time}
+                        </p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {selectedVehicle && selectedDate && (
+          <Modal onClose={() => { setSelectedVehicle(null); setSelectedDate(null); }} title={selectedVehicle.name}>
+            <p className="text-gray-600 text-sm mb-4">Ngày: {formatDate(selectedDate)}</p>
+            <div className="space-y-3 mb-6">
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border-2 border-blue-300">
+                <p className="text-sm text-gray-700 mb-1 font-semibold">💰 Giá thuê theo ngày</p>
+                <p className="text-3xl sm:text-4xl font-bold text-blue-600">
+                  {formatNumber(selectedVehicle.price_day)}đ<span className="text-xl">/ngày</span>
+                </p>
+              </div>
+              <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl border-2 border-green-300">
+                <p className="text-sm text-gray-700 mb-1 font-semibold">📅 Giá thuê theo tuần</p>
+                <p className="text-3xl sm:text-4xl font-bold text-green-600">
+                  {formatNumber(selectedVehicle.price_week)}đ<span className="text-xl">/tuần</span>
+                </p>
+              </div>
+              <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl border-2 border-purple-300">
+                <p className="text-sm text-gray-700 mb-1 font-semibold">📆 Giá thuê theo tháng</p>
+                <p className="text-3xl sm:text-4xl font-bold text-purple-600">
+                  {formatNumber(selectedVehicle.price_month)}đ<span className="text-xl">/tháng</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <a 
+                href={`https://zalo.me/${contactPhone}?text=Xin chào, tôi muốn thuê xe ${selectedVehicle.name} (${selectedVehicle.plate}) vào ngày ${formatDate(selectedDate)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-xl text-center font-bold hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition text-base sm:text-lg"
+              >
+                💬 Đặt xe qua Zalo
+              </a>
+              <a 
+                href={`tel:${contactPhone}`}
+                className="block w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 rounded-xl text-center font-bold hover:from-green-700 hover:to-green-800 shadow-lg hover:shadow-xl transition text-base sm:text-lg flex items-center justify-center gap-2"
+              >
+                <Phone className="w-5 h-5" />
+                Gọi ngay: {contactPhone}
+              </a>
+            </div>
+
+            <div className="mt-6 pt-6 border-t-2 border-gray-100">
+              <p className="text-sm text-gray-600 text-center">
+                🚗 {selectedVehicle.seats} chỗ • {selectedVehicle.transmission} • {selectedVehicle.fuel}
+              </p>
+            </div>
+          </Modal>
+        )}
+      </main>
+
+      <footer className="bg-gray-800 text-white py-8 mt-16">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <p className="text-lg font-semibold mb-2">🚗 AutoRent Pro - Cho thuê xe uy tín</p>
+          <p className="text-gray-400">Liên hệ: {contactPhone} • {contactName}</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
 }
