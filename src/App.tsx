@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Car, DollarSign, TrendingUp, Calendar, Users, Wrench, LayoutDashboard, LogOut, Plus, Save, Search, Edit, Trash2, X, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, UserPlus, AlertCircle, Link as LinkIcon, Phone } from 'lucide-react';
+import { Car, DollarSign, TrendingUp, Calendar, Users, Wrench, LayoutDashboard, LogOut, Plus, Save, Search, Edit, Trash2, X, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, UserPlus, AlertCircle, Link as LinkIcon, Phone, Eye } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -9,7 +9,6 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // ===== CONSTANTS & PERMISSIONS =====
 const PAGE_SIZE = 10;
 
-// Danh sách user demo
 const DEMO_USERS = [
   { id: "1", username: "admin", name: "Admin", role: "admin" },
   { id: "2", username: "nhanvien1", name: "Nhân viên 1", role: "staff" },
@@ -18,7 +17,6 @@ const DEMO_USERS = [
   { id: "5", username: "doitac2", name: "Đối tác XYZ", role: "partner" }
 ];
 
-// Mật khẩu demo
 const DEMO_PASSWORDS: any = {
   admin: "admin123",
   nhanvien1: "staff123",
@@ -27,19 +25,17 @@ const DEMO_PASSWORDS: any = {
   doitac2: "partner123"
 };
 
-// Quyền truy cập các tab (READ permission)
 const PERMISSIONS: any = {
   admin: ["dashboard", "vehicles", "rentals", "customers", "expenses", "calendar"],
-  staff: ["dashboard", "rentals", "customers", "calendar"], // Nhân viên: chỉ làm việc với HĐ và KH
-  partner: ["dashboard", "vehicles", "rentals", "customers", "expenses", "calendar"] // Đối tác: xem tất cả
+  staff: ["dashboard", "rentals", "customers", "calendar"],
+  partner: ["dashboard", "vehicles", "rentals", "customers", "expenses", "calendar"]
 };
 
-// Quyền ghi/sửa/xóa dữ liệu (WRITE permission)
 const WRITE_PERMS: any = {
-  vehicles: ["admin"], // Chỉ admin quản lý xe
-  rentals: ["admin", "staff"], // Admin + Nhân viên tạo hợp đồng
-  customers: ["admin", "staff"], // Admin + Nhân viên quản lý khách hàng
-  expenses: ["admin"] // Chỉ admin quản lý chi phí
+  vehicles: ["admin"],
+  rentals: ["admin", "staff"],
+  customers: ["admin", "staff"],
+  expenses: ["admin"]
 };
 
 const EXP_OPTIONS = [
@@ -540,25 +536,38 @@ function VehiclesTab({ vehicles, setVehicles, rentals, notify, setLoading, canWr
     </div>
   );
 }
-
+// ===== RENTALS TAB WITH OVERLAP CHECK =====
 function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, checkOverlap, notify, setLoading, customerName, vehicleName, vehiclePlate, vMap, canWrite }: any) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
   const [returnModal, setReturnModal] = useState<any>(null);
+  const [editingRental, setEditingRental] = useState<any>(null);
   const emptyForm = { customer_id: "", vehicle_id: "", start_date: "", start_time: "09:00", end_date: "", end_time: "18:00", rental_type: "day", custom_price: "", deposit: "", pickup_location: "", notes: "", odo_start: "" };
   const [form, setForm] = useState<any>({ ...emptyForm });
   const [returnForm, setReturnForm] = useState<any>({ odo_end: "", surcharge: "0", surcharge_note: "" });
   const [errors, setErrors] = useState<any>({});
   
-  const calculatePrice = () => {
-    if (!form.vehicle_id || !form.start_date || !form.end_date) return 0;
-    const vehicle = vMap[form.vehicle_id];
+  const calculatePrice = (formData?: any) => {
+    const f = formData || form;
+    if (!f.vehicle_id || !f.start_date || !f.end_date) return 0;
+    const vehicle = vMap[f.vehicle_id];
     if (!vehicle) return 0;
-    const days = Math.ceil((new Date(form.end_date).getTime() - new Date(form.start_date).getTime()) / 86400000);
+    const days = Math.ceil((new Date(f.end_date).getTime() - new Date(f.start_date).getTime()) / 86400000);
     if (days <= 0) return 0;
-    if (form.rental_type === "day") return days * vehicle.price_day;
-    if (form.rental_type === "week") return Math.ceil(days / 7) * vehicle.price_week;
+    if (f.rental_type === "day") return days * vehicle.price_day;
+    if (f.rental_type === "week") return Math.ceil(days / 7) * vehicle.price_week;
+    return Math.ceil(days / 30) * vehicle.price_month;
+  };
+
+  const calculateEditPrice = () => {
+    if (!editingRental || !editingRental.vehicle_id || !editingRental.start_date || !editingRental.end_date) return 0;
+    const vehicle = vMap[editingRental.vehicle_id];
+    if (!vehicle) return 0;
+    const days = Math.ceil((new Date(editingRental.end_date).getTime() - new Date(editingRental.start_date).getTime()) / 86400000);
+    if (days <= 0) return 0;
+    if (editingRental.rental_type === "day") return days * vehicle.price_day;
+    if (editingRental.rental_type === "week") return Math.ceil(days / 7) * vehicle.price_week;
     return Math.ceil(days / 30) * vehicle.price_month;
   };
 
@@ -572,9 +581,14 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
     if (!form.end_date) e.end_date = "Chọn ngày";
     else if (form.start_date && form.end_date <= form.start_date) e.end_date = "Phải sau ngày nhận";
     if (!form.odo_start) e.odo_start = "Nhập ODO";
-    if (form.vehicle_id && form.start_date && form.end_date && !e.end_date && checkOverlap(form.vehicle_id, form.start_date, form.end_date)) {
-      e.vehicle_id = "Xe đã có lịch thuê trùng!";
+    
+    // ⚠️ CHECK TRÙNG LỊCH
+    if (form.vehicle_id && form.start_date && form.end_date && !e.end_date) {
+      if (checkOverlap(form.vehicle_id, form.start_date, form.end_date)) {
+        e.vehicle_id = "⚠️ Xe đã có lịch thuê trùng!";
+      }
     }
+    
     const v = vMap[form.vehicle_id];
     if (v && form.odo_start && parseInt(form.odo_start) < v.odo) e.odo_start = "Phải ≥ " + formatNumber(v.odo);
     setErrors(e);
@@ -623,6 +637,53 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
     });
   };
 
+  const updateRental = () => {
+    if (!editingRental.customer_id || !editingRental.start_date || !editingRental.end_date) {
+      notify("❌ Vui lòng điền đầy đủ thông tin!", "error");
+      return;
+    }
+
+    if (new Date(editingRental.end_date) <= new Date(editingRental.start_date)) {
+      notify("❌ Ngày trả phải sau ngày nhận!", "error");
+      return;
+    }
+
+    // ⚠️ CHECK TRÙNG LỊCH KHI SỬA (bỏ qua chính hợp đồng đang sửa)
+    if (checkOverlap(editingRental.vehicle_id, editingRental.start_date, editingRental.end_date, editingRental.id)) {
+      notify("❌ Xe đã có lịch thuê trùng trong khoảng thời gian này!", "error");
+      return;
+    }
+
+    const days = Math.ceil((new Date(editingRental.end_date).getTime() - new Date(editingRental.start_date).getTime()) / 86400000);
+    const basePrice = calculateEditPrice();
+    const finalPrice = editingRental.custom_total ? parseInt(editingRental.custom_total) : basePrice;
+    const deposit = Math.min(parseInt(editingRental.deposit) || 0, finalPrice);
+
+    const updates = {
+      customer_id: editingRental.customer_id,
+      start_date: editingRental.start_date,
+      start_time: editingRental.start_time,
+      end_date: editingRental.end_date,
+      end_time: editingRental.end_time,
+      rental_type: editingRental.rental_type,
+      total_days: days,
+      base_price: basePrice,
+      total: finalPrice,
+      deposit: deposit,
+      paid: deposit,
+      pickup_location: editingRental.pickup_location,
+      notes: editingRental.notes
+    };
+
+    dbUpdate('rentals', editingRental.id, updates, (ur: any) => {
+      if (ur) {
+        setRentals((prev: any) => prev.map((r: any) => r.id === editingRental.id ? { ...r, ...ur } : r));
+        setEditingRental(null);
+        notify("✅ Cập nhật HĐ thành công!");
+      }
+    });
+  };
+
   const doReturn = () => {
     const r = returnModal;
     if (!returnForm.odo_end || parseInt(returnForm.odo_end) < r.odo_start) {
@@ -658,6 +719,7 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
   };
 
   const basePrice = calculatePrice();
+  const editBasePrice = calculateEditPrice();
   
   const filtered = rentals.filter((r: any) => {
     if (!search) return true;
@@ -714,12 +776,15 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
             )}
             <FormInput label="Tiền cọc" type="number" value={form.deposit} onChange={(v: string) => setForm({ ...form, deposit: v })} />
             <FormInput label="Địa điểm nhận" value={form.pickup_location} onChange={(v: string) => setForm({ ...form, pickup_location: v })} />
+            <div className="sm:col-span-2">
+              <FormInput label="Ghi chú" value={form.notes} onChange={(v: string) => setForm({ ...form, notes: v })} textarea />
+            </div>
           </div>
           <div className="flex gap-2 mt-3">
             <button onClick={createRental} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 flex items-center gap-1.5">
               <Save className="w-4 h-4" />Tạo
             </button>
-            <button onClick={() => { setShowAdd(false); setErrors({}); }} className="bg-gray-200 px-4 py-2 rounded-lg text-sm">Hủy</button>
+            <button onClick={() => { setShowAdd(false); setErrors({}); setForm({ ...emptyForm }); }} className="bg-gray-200 px-4 py-2 rounded-lg text-sm">Hủy</button>
           </div>
         </div>
       )}
@@ -764,14 +829,29 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
                       <Badge color={statusColor}>{statusText}</Badge>
                     </td>
                     <td className="px-3 py-2.5">
-                      {r.status === "active" && canWrite("rentals") && (
-                        <button 
-                          onClick={() => { setReturnModal(r); setReturnForm({ odo_end: String(r.odo_start), surcharge: "0", surcharge_note: "" }); }} 
-                          className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 flex items-center gap-1"
-                        >
-                          <RotateCcw className="w-3 h-3" />Trả
-                        </button>
-                      )}
+                      <div className="flex gap-1">
+                        {r.status === "active" && canWrite("rentals") && (
+                          <>
+                            <button 
+                              onClick={() => {
+                                setEditingRental({
+                                  ...r,
+                                  custom_total: ""
+                                });
+                              }} 
+                              className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs hover:bg-blue-200 flex items-center gap-1"
+                            >
+                              <Edit className="w-3 h-3" />Sửa
+                            </button>
+                            <button 
+                              onClick={() => { setReturnModal(r); setReturnForm({ odo_end: String(r.odo_start), surcharge: "0", surcharge_note: "" }); }} 
+                              className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700 flex items-center gap-1"
+                            >
+                              <RotateCcw className="w-3 h-3" />Trả
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -784,6 +864,137 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
       
       <Pagination page={page} total={filtered.length} onChange={setPage} />
 
+      {/* Modal Sửa Hợp Đồng */}
+      {editingRental && (
+        <Modal onClose={() => setEditingRental(null)} title="Sửa hợp đồng">
+          <div className="space-y-3">
+            <div className="p-3 bg-blue-50 rounded-xl text-sm">
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-600">Xe:</span>
+                <span className="font-semibold">{vehicleName(editingRental.vehicle_id)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Cọc đã nhận:</span>
+                <span className="font-semibold text-blue-600">{formatNumber(editingRental.deposit)}đ</span>
+              </div>
+            </div>
+
+            <SelectInput 
+              label="Khách hàng" 
+              value={editingRental.customer_id} 
+              onChange={(v: string) => setEditingRental({...editingRental, customer_id: v})} 
+              options={customers.map((c: any) => ({ value: c.id, label: c.name + " — " + c.phone }))} 
+            />
+            
+            <div className="grid grid-cols-2 gap-3">
+              <FormInput 
+                label="Ngày nhận" 
+                type="date" 
+                value={editingRental.start_date} 
+                onChange={(v: string) => setEditingRental({...editingRental, start_date: v, custom_total: ""})} 
+              />
+              <FormInput 
+                label="Giờ nhận" 
+                type="time" 
+                value={editingRental.start_time} 
+                onChange={(v: string) => setEditingRental({...editingRental, start_time: v})} 
+              />
+              <FormInput 
+                label="Ngày trả" 
+                type="date" 
+                value={editingRental.end_date} 
+                onChange={(v: string) => setEditingRental({...editingRental, end_date: v, custom_total: ""})} 
+              />
+              <FormInput 
+                label="Giờ trả" 
+                type="time" 
+                value={editingRental.end_time} 
+                onChange={(v: string) => setEditingRental({...editingRental, end_time: v})} 
+              />
+            </div>
+            
+            <SelectInput 
+              label="Loại thuê" 
+              value={editingRental.rental_type} 
+              onChange={(v: string) => setEditingRental({...editingRental, rental_type: v, custom_total: ""})} 
+              options={[{ value: "day", label: "Ngày" }, { value: "week", label: "Tuần" }, { value: "month", label: "Tháng" }]} 
+            />
+
+            {editBasePrice > 0 && (
+              <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl border-2 border-green-300">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-gray-700 font-semibold">💰 Giá tự động tính:</span>
+                  <span className="text-2xl font-bold text-green-600">{formatNumber(editBasePrice)}đ</span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  {Math.ceil((new Date(editingRental.end_date).getTime() - new Date(editingRental.start_date).getTime()) / 86400000)} ngày 
+                  × {editingRental.rental_type === "day" ? "ngày" : editingRental.rental_type === "week" ? "tuần" : "tháng"}
+                </p>
+                
+                <div className="mt-3 pt-3 border-t border-green-200">
+                  <FormInput 
+                    label="Hoặc nhập giá tùy chỉnh (để trống = dùng giá tự động)" 
+                    type="number" 
+                    value={editingRental.custom_total} 
+                    onChange={(v: string) => setEditingRental({...editingRental, custom_total: v})} 
+                    placeholder={formatNumber(editBasePrice)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="p-3 bg-blue-50 rounded-xl">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-700">Tổng tiền cuối cùng:</span>
+                <span className="text-xl font-bold text-blue-600">
+                  {formatNumber(editingRental.custom_total ? parseInt(editingRental.custom_total) : editBasePrice)}đ
+                </span>
+              </div>
+              {editingRental.custom_total && parseInt(editingRental.custom_total) !== editBasePrice && (
+                <p className="text-xs text-orange-600 mt-1">
+                  {parseInt(editingRental.custom_total) > editBasePrice ? "↑" : "↓"} 
+                  {" "}Chênh lệch: {formatNumber(Math.abs(parseInt(editingRental.custom_total) - editBasePrice))}đ
+                </p>
+              )}
+            </div>
+
+            <FormInput 
+              label="Tiền cọc đã nhận" 
+              type="number" 
+              value={editingRental.deposit} 
+              onChange={(v: string) => setEditingRental({...editingRental, deposit: v})} 
+            />
+            <FormInput 
+              label="Địa điểm nhận" 
+              value={editingRental.pickup_location} 
+              onChange={(v: string) => setEditingRental({...editingRental, pickup_location: v})} 
+            />
+            <FormInput 
+              label="Ghi chú" 
+              value={editingRental.notes || ""} 
+              onChange={(v: string) => setEditingRental({...editingRental, notes: v})} 
+              textarea 
+            />
+            
+            <div className="flex gap-2 pt-2">
+              <button 
+                onClick={updateRental} 
+                className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
+              >
+                <Save className="w-4 h-4" />Lưu thay đổi
+              </button>
+              <button 
+                onClick={() => setEditingRental(null)} 
+                className="flex-1 bg-gray-200 py-2.5 rounded-xl"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal Trả Xe */}
       {returnModal && (
         <Modal onClose={() => setReturnModal(null)} title="Trả xe">
           <div className="space-y-3">
@@ -851,11 +1062,14 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
     </div>
   );
 }
+
+// ===== CUSTOMERS TAB =====
 function CustomersTab({ customers, setCustomers, rentals, vehicleName, notify, canWrite }: any) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const emptyForm = { name: "", phone: "", address: "", id_card: "", license: "" };
   const [form, setForm] = useState<any>({ ...emptyForm });
   const [errors, setErrors] = useState<any>({});
@@ -877,6 +1091,34 @@ function CustomersTab({ customers, setCustomers, rentals, vehicleName, notify, c
         setShowAdd(false);
         setErrors({});
         notify("✅ Thêm KH thành công!");
+      }
+    });
+  };
+
+  const updateCustomer = () => {
+    const e: any = {};
+    if (!editingCustomer.name.trim()) e.name = "Bắt buộc";
+    if (!editingCustomer.phone) e.phone = "Bắt buộc";
+    else if (!/^0\d{9}$/.test(editingCustomer.phone)) e.phone = "10 số, bắt đầu bằng 0";
+    else if (customers.some((c: any) => c.phone === editingCustomer.phone && c.id !== editingCustomer.id)) e.phone = "Đã tồn tại";
+    if (editingCustomer.id_card && !/^\d{9}$|^\d{12}$/.test(editingCustomer.id_card)) e.id_card = "9 hoặc 12 số";
+    setErrors(e);
+    if (Object.keys(e).length) return;
+
+    const updates = {
+      name: editingCustomer.name,
+      phone: editingCustomer.phone,
+      address: editingCustomer.address,
+      id_card: editingCustomer.id_card,
+      license: editingCustomer.license
+    };
+
+    dbUpdate('customers', editingCustomer.id, updates, (uc: any) => {
+      if (uc) {
+        setCustomers((prev: any) => prev.map((c: any) => c.id === editingCustomer.id ? { ...c, ...uc } : c));
+        setEditingCustomer(null);
+        setErrors({});
+        notify("✅ Cập nhật KH thành công!");
       }
     });
   };
@@ -941,25 +1183,41 @@ function CustomersTab({ customers, setCustomers, rentals, vehicleName, notify, c
           return (
             <div 
               key={c.id} 
-              className="bg-white rounded-xl shadow-sm border p-4 hover:shadow-md cursor-pointer transition" 
-              onClick={() => setSelectedCustomer(c)}
+              className="bg-white rounded-xl shadow-sm border p-4 hover:shadow-md transition"
             >
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold shrink-0">
                   {c.name[0]}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <h3 className="font-semibold text-sm truncate">{c.name}</h3>
                   <p className="text-xs text-gray-500">{c.phone}</p>
                 </div>
               </div>
-              <div className="flex justify-between py-0.5">
-                <span className="text-gray-500 text-sm">Hợp đồng:</span>
-                <span className="text-sm font-medium">{customerRentals.length}</span>
+              <div className="flex justify-between py-0.5 text-sm">
+                <span className="text-gray-500">Hợp đồng:</span>
+                <span className="font-medium">{customerRentals.length}</span>
               </div>
-              <div className="flex justify-between py-0.5">
-                <span className="text-gray-500 text-sm">Chi tiêu:</span>
-                <span className="text-sm font-medium text-green-600">{formatNumber(spent)}đ</span>
+              <div className="flex justify-between py-0.5 text-sm mb-3">
+                <span className="text-gray-500">Chi tiêu:</span>
+                <span className="font-medium text-green-600">{formatNumber(spent)}đ</span>
+              </div>
+              
+              <div className="flex gap-2 pt-2 border-t">
+                <button 
+                  onClick={() => setSelectedCustomer(c)}
+                  className="flex-1 bg-blue-100 text-blue-700 py-1.5 rounded text-xs hover:bg-blue-200 flex items-center justify-center gap-1"
+                >
+                  <Eye className="w-3 h-3" />Xem
+                </button>
+                {canWrite("customers") && (
+                  <button 
+                    onClick={() => setEditingCustomer(c)}
+                    className="flex-1 bg-green-100 text-green-700 py-1.5 rounded text-xs hover:bg-green-200 flex items-center justify-center gap-1"
+                  >
+                    <Edit className="w-3 h-3" />Sửa
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -1008,33 +1266,56 @@ function CustomersTab({ customers, setCustomers, rentals, vehicleName, notify, c
           </div>
         </Modal>
       )}
+
+      {editingCustomer && (
+        <Modal onClose={() => { setEditingCustomer(null); setErrors({}); }} title="Sửa thông tin khách hàng">
+          <div className="space-y-3">
+            <FormInput label="Họ tên *" value={editingCustomer.name} onChange={(v: string) => setEditingCustomer({ ...editingCustomer, name: v })} error={errors.name} />
+            <FormInput label="SĐT *" value={editingCustomer.phone} onChange={(v: string) => setEditingCustomer({ ...editingCustomer, phone: v.replace(/\D/g, "") })} error={errors.phone} />
+            <FormInput label="Địa chỉ" value={editingCustomer.address} onChange={(v: string) => setEditingCustomer({ ...editingCustomer, address: v })} />
+            <FormInput label="CMND/CCCD" value={editingCustomer.id_card} onChange={(v: string) => setEditingCustomer({ ...editingCustomer, id_card: v.replace(/\D/g, "") })} error={errors.id_card} />
+            <FormInput label="Bằng lái" value={editingCustomer.license} onChange={(v: string) => setEditingCustomer({ ...editingCustomer, license: v })} />
+            
+            <div className="flex gap-2 pt-2">
+              <button 
+                onClick={updateCustomer} 
+                className="flex-1 bg-green-600 text-white py-2.5 rounded-xl font-medium hover:bg-green-700 flex items-center justify-center gap-2"
+              >
+                <Save className="w-4 h-4" />Lưu thay đổi
+              </button>
+              <button 
+                onClick={() => { setEditingCustomer(null); setErrors({}); }} 
+                className="flex-1 bg-gray-200 py-2.5 rounded-xl"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
 
-function ExpensesTab({ expenses, setExpenses, vehicles, vMap, notify, canWrite }: any) {
-  const [filterType, setFilterType] = useState("all");
+// ===== EXPENSES TAB =====
+function ExpensesTab({ expenses, setExpenses, vehicles, notify, vMap, vehicleName, canWrite }: any) {
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<any>(null);
-  const emptyForm = { vehicle_id: "", type: "", amount: "", date: "", description: "" };
+  const emptyForm = { vehicle_id: "", type: "fuel", amount: "", date: todayString(), description: "" };
   const [form, setForm] = useState<any>({ ...emptyForm });
   const [errors, setErrors] = useState<any>({});
-  
-  const total = expenses.reduce((s: number, e: any) => s + e.amount, 0);
-  
-  const vehicleOptions = vehicles.map((v: any) => ({ value: v.id, label: v.name + " — " + v.plate }));
-  
+
   const addExpense = () => {
     const e: any = {};
     if (!form.vehicle_id) e.vehicle_id = "Chọn xe";
-    if (!form.type) e.type = "Chọn loại";
     if (!form.amount || parseInt(form.amount) <= 0) e.amount = "> 0";
     if (!form.date) e.date = "Chọn ngày";
     setErrors(e);
     if (Object.keys(e).length) return;
 
-    const row = {
+    const newExp = {
       vehicle_id: form.vehicle_id,
       type: form.type,
       amount: parseInt(form.amount),
@@ -1042,35 +1323,58 @@ function ExpensesTab({ expenses, setExpenses, vehicles, vMap, notify, canWrite }
       description: form.description
     };
 
-    dbInsert('expenses', row, (ne: any) => {
+    dbInsert('expenses', newExp, (ne: any) => {
       if (ne) {
         setExpenses((prev: any) => [ne, ...prev]);
         setForm({ ...emptyForm });
         setShowAdd(false);
         setErrors({});
-        notify("✅ Thêm thành công!");
+        notify("✅ Thêm chi phí thành công!");
       }
     });
   };
 
-  const filtered = expenses.filter((e: any) => filterType === "all" || e.type === filterType)
-    .sort((a: any, b: any) => b.date.localeCompare(a.date));
-  
+  const deleteExpense = (id: string) => {
+    dbDelete('expenses', id, (ok: boolean) => {
+      if (ok) {
+        setExpenses((prev: any) => prev.filter((e: any) => e.id !== id));
+        notify("✅ Đã xóa chi phí!");
+      }
+    });
+  };
+
+  const filtered = expenses.filter((e: any) => {
+    if (typeFilter && e.type !== typeFilter) return false;
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return vehicleName(e.vehicle_id).toLowerCase().includes(s);
+  }).sort((a: any, b: any) => (b.date || "").localeCompare(a.date || ""));
+
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const vehicleOptions = vehicles.map((v: any) => ({ value: v.id, label: v.name + " — " + v.plate }));
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="flex flex-wrap justify-between items-center gap-2">
-        <h2 className="text-xl font-bold">Chi phí</h2>
+        <h2 className="text-xl font-bold">Chi phí ({expenses.length})</h2>
         <div className="flex gap-2 items-center flex-wrap">
           <select 
-            value={filterType} 
-            onChange={(e) => { setFilterType(e.target.value); setPage(1); }} 
+            value={typeFilter} 
+            onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }} 
             className="px-3 py-2 border rounded-lg text-sm"
           >
-            <option value="all">Tất cả</option>
-            {EXP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            <option value="">Tất cả</option>
+            {EXP_OPTIONS.map((o: any) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-gray-400" />
+            <input 
+              value={search} 
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }} 
+              placeholder="Tìm xe..." 
+              className="pl-8 pr-3 py-2 border rounded-lg text-sm w-36" 
+            />
+          </div>
           {canWrite("expenses") && (
             <button 
               onClick={() => setShowAdd(true)} 
@@ -1087,10 +1391,12 @@ function ExpensesTab({ expenses, setExpenses, vehicles, vMap, notify, canWrite }
           <h3 className="font-semibold mb-3 text-sm">Thêm chi phí</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <SelectInput label="Xe *" value={form.vehicle_id} onChange={(v: string) => setForm({ ...form, vehicle_id: v })} options={vehicleOptions} error={errors.vehicle_id} />
-            <SelectInput label="Loại *" value={form.type} onChange={(v: string) => setForm({ ...form, type: v })} options={EXP_OPTIONS} error={errors.type} />
+            <SelectInput label="Loại" value={form.type} onChange={(v: string) => setForm({ ...form, type: v })} options={EXP_OPTIONS} />
             <FormInput label="Số tiền *" type="number" value={form.amount} onChange={(v: string) => setForm({ ...form, amount: v })} error={errors.amount} />
             <FormInput label="Ngày *" type="date" value={form.date} onChange={(v: string) => setForm({ ...form, date: v })} error={errors.date} />
-            <FormInput label="Mô tả" value={form.description} onChange={(v: string) => setForm({ ...form, description: v })} textarea className="sm:col-span-2" />
+            <div className="sm:col-span-2">
+              <FormInput label="Mô tả" value={form.description} onChange={(v: string) => setForm({ ...form, description: v })} />
+            </div>
           </div>
           <div className="flex gap-2 mt-3">
             <button onClick={addExpense} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 flex items-center gap-1.5">
@@ -1100,13 +1406,7 @@ function ExpensesTab({ expenses, setExpenses, vehicles, vMap, notify, canWrite }
           </div>
         </div>
       )}
-      
-      <div className="bg-white rounded-xl shadow-sm border p-4">
-        <p className="text-sm text-gray-500">
-          Tổng: <span className="text-xl font-bold text-red-600">{formatNumber(total)}đ</span>
-        </p>
-      </div>
-      
+
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -1117,686 +1417,410 @@ function ExpensesTab({ expenses, setExpenses, vehicles, vMap, notify, canWrite }
                 <th className="px-3 py-2.5 text-left">Loại</th>
                 <th className="px-3 py-2.5 text-left">Mô tả</th>
                 <th className="px-3 py-2.5 text-right">Tiền</th>
-                <th className="px-3 py-2.5"></th>
+                {canWrite("expenses") && <th className="px-3 py-2.5"></th>}
               </tr>
             </thead>
             <tbody className="divide-y">
-              {paginated.map((e: any) => {
-                const vehicle = vMap[e.vehicle_id];
-                const typeLabel = EXP_LABELS[e.type] || e.type;
-                
-                return (
-                  <tr key={e.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-2.5">{formatDate(e.date)}</td>
-                    <td className="px-3 py-2.5">{vehicle?.name}</td>
-                    <td className="px-3 py-2.5"><Badge color="gray">{typeLabel}</Badge></td>
-                    <td className="px-3 py-2.5 text-gray-500 truncate max-w-[200px]">{e.description}</td>
-                    <td className="px-3 py-2.5 text-right text-red-500 font-medium">
-                      -{formatNumber(e.amount)}đ
-                    </td>
+              {paginated.map((e: any) => (
+                <tr key={e.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2.5">{formatDate(e.date)}</td>
+                  <td className="px-3 py-2.5">{vehicleName(e.vehicle_id)}</td>
+                  <td className="px-3 py-2.5">
+                    <Badge color="blue">{EXP_LABELS[e.type]}</Badge>
+                  </td>
+                  <td className="px-3 py-2.5 text-gray-600">{e.description || "—"}</td>
+                  <td className="px-3 py-2.5 text-right font-semibold text-red-600">
+                    {formatNumber(e.amount)}đ
+                  </td>
+                  {canWrite("expenses") && (
                     <td className="px-3 py-2.5">
-                      {canWrite("expenses") && (
-                        <button 
-                          onClick={() => setDeleteConfirm(e)} 
-                          className="text-red-400 hover:text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      <button 
+                        onClick={() => deleteExpense(e.id)} 
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
-                  </tr>
-                );
-              })}
+                  )}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
         {paginated.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">Không có</p>}
       </div>
-      
-      <Pagination page={page} total={filtered.length} onChange={setPage} />
 
-      {deleteConfirm && (
-        <ConfirmModal 
-          msg={"Xóa chi phí " + formatNumber(deleteConfirm.amount) + "đ?"} 
-          onConfirm={() => {
-            dbDelete('expenses', deleteConfirm.id, (ok: boolean) => {
-              if (ok) {
-                setExpenses((prev: any) => prev.filter((x: any) => x.id !== deleteConfirm.id));
-                notify("✅ Đã xóa");
-              }
-              setDeleteConfirm(null);
-            });
-          }} 
-          onCancel={() => setDeleteConfirm(null)} 
-        />
-      )}
+      <Pagination page={page} total={filtered.length} onChange={setPage} />
     </div>
   );
 }
 
-function CalendarTab({ vehicles, getVehicleStatus, customerName, month, setMonth, notify }: any) {
-  const year = month.getFullYear();
-  const monthNum = month.getMonth();
-  const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
-  const startDay = new Date(year, monthNum, 1).getDay();
-  const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-  const today = todayString();
-  const [shareLink, setShareLink] = useState("");
-  
-  const empties = Array.from({ length: startDay }, (_, i) => i);
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+// ===== CALENDAR & PUBLIC BOOKING =====
+function CalendarTab({ vehicles, rentals, vMap }: any) {
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [showLink, setShowLink] = useState(false);
 
-  const generateShareLink = () => {
-    const link = `${window.location.origin}?view=booking`;
-    setShareLink(link);
-    navigator.clipboard.writeText(link);
-    notify("✅ Đã copy link vào clipboard!");
+  const year = selectedMonth.getFullYear();
+  const month = selectedMonth.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const prevMonth = () => setSelectedMonth(new Date(year, month - 1, 1));
+  const nextMonth = () => setSelectedMonth(new Date(year, month + 1, 1));
+
+  const getVehicleStatus = (vehicleId: string, date: Date) => {
+    const dateStr = date.toISOString().split("T")[0];
+    const activeRental = rentals.find((r: any) => 
+      r.vehicle_id === vehicleId && 
+      r.status === "active" && 
+      r.start_date <= dateStr && 
+      r.end_date >= dateStr
+    );
+    return activeRental ? "rented" : "available";
   };
+
+  const generateBookingLink = () => {
+    const url = window.location.origin + window.location.pathname + "?view=booking";
+    navigator.clipboard.writeText(url);
+    setShowLink(true);
+    setTimeout(() => setShowLink(false), 2000);
+  };
+
+  const monthName = selectedMonth.toLocaleDateString("vi-VN", { month: "long", year: "numeric" });
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-3">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold">Lịch xe - {monthName}</h2>
+        <div className="flex gap-2">
           <button 
-            onClick={() => setMonth(new Date(year, monthNum - 1, 1))} 
-            className="p-1.5 hover:bg-gray-100 rounded-lg"
+            onClick={generateBookingLink} 
+            className="bg-blue-600 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 hover:bg-blue-700 text-sm"
           >
+            <LinkIcon className="w-4 h-4" />Tạo link gửi khách
+          </button>
+          <button onClick={prevMonth} className="px-3 py-2 border rounded-lg hover:bg-gray-50">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-xl font-bold">Tháng {monthNum + 1}/{year}</h2>
-          <button 
-            onClick={() => setMonth(new Date(year, monthNum + 1, 1))} 
-            className="p-1.5 hover:bg-gray-100 rounded-lg"
-          >
+          <button onClick={nextMonth} className="px-3 py-2 border rounded-lg hover:bg-gray-50">
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
-        <button 
-          onClick={generateShareLink} 
-          className="bg-blue-600 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 hover:bg-blue-700 text-sm"
-        >
-          <LinkIcon className="w-4 h-4" />
-          Tạo link gửi khách
-        </button>
       </div>
 
-      {shareLink && (
-        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
-          <p className="font-semibold mb-2">📋 Link booking đã được copy!</p>
-          <div className="bg-white p-3 rounded border break-all text-sm mb-2">
-            {shareLink}
-          </div>
-          <p className="text-sm text-gray-600">Khách hàng click vào link sẽ thấy lịch trống và thông tin xe để đặt lịch</p>
+      {showLink && (
+        <div className="bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded-lg">
+          ✅ Đã copy link booking vào clipboard!
         </div>
       )}
-      
-      {vehicles.map((v: any) => (
-        <div key={v.id} className="bg-white rounded-xl shadow-sm border p-3 sm:p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-2xl">{v.image}</span>
-            <div>
-              <h3 className="font-semibold text-sm">{v.name}</h3>
-              <p className="text-xs text-gray-500">{v.plate}</p>
+
+      <div className="bg-white rounded-xl shadow-sm border p-4">
+        <div className="grid grid-cols-7 gap-1 mb-2 text-xs font-semibold text-gray-600">
+          {["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map((d) => (
+            <div key={d} className="text-center py-2">{d}</div>
+          ))}
+        </div>
+
+        {vehicles.filter((v: any) => v.status !== "maintenance").map((vehicle: any) => (
+          <div key={vehicle.id} className="mb-4 pb-4 border-b last:border-0">
+            <h3 className="font-semibold mb-2 text-sm">{vehicle.name} - {vehicle.plate}</h3>
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: firstDay }).map((_, i) => (
+                <div key={`empty-${i}`} className="aspect-square" />
+              ))}
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                const day = i + 1;
+                const date = new Date(year, month, day);
+                const status = getVehicleStatus(vehicle.id, date);
+                const bgColor = status === "available" ? "bg-green-100" : "bg-orange-100";
+                const icon = status === "available" ? "✅" : "🔄";
+                
+                return (
+                  <div
+                    key={day}
+                    className={`aspect-square ${bgColor} rounded flex flex-col items-center justify-center text-xs`}
+                  >
+                    <span className="text-xs">{icon}</span>
+                    <span className="font-medium">{day}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          
-          <div className="grid grid-cols-7 gap-1.5">
-            {dayNames.map(d => (
-              <div key={d} className="text-center text-xs font-semibold text-gray-400 py-0.5">
-                {d}
-              </div>
-            ))}
-            
-            {empties.map(i => <div key={`empty-${i}`} />)}
-            
-            {days.map(day => {
-              const dateStr = `${year}-${String(monthNum + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-              const status = getVehicleStatus(v.id, dateStr);
-              const isToday = dateStr === today;
-              
-              const borderClass = isToday ? "border-blue-500 border-2" : "border-gray-100";
-              const bgClass = status.status === "available" ? "bg-green-50" : "bg-red-50";
-              const textClass = status.status === "available" ? "text-green-600" : "text-red-600";
-              
-              return (
-                <div 
-                  key={day} 
-                  className={`rounded-lg p-1.5 min-h-[48px] sm:min-h-[56px] border ${borderClass} ${bgClass}`}
-                >
-                  <p className="text-xs font-semibold">{day}</p>
-                  <p className={`text-[10px] ${textClass}`}>
-                    {status.status === "available" ? "✅" : "🔄"}
-                  </p>
-                  {status.time && (
-                    <p className="text-[10px] text-orange-600">{status.time}</p>
-                  )}
-                  {status.rental && (
-                    <p className="text-[10px] text-gray-500 truncate">
-                      {customerName(status.rental.customer_id)}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
 
-// ===== PUBLIC BOOKING VIEW =====
-function PublicBookingView({ vehicles, rentals, getVehicleStatus, customerName, month, setMonth }: any) {
-  const year = month.getFullYear();
-  const monthNum = month.getMonth();
-  const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
-  const startDay = new Date(year, monthNum, 1).getDay();
-  const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-  const today = todayString();
+function PublicBookingView({ vehicles, rentals }: any) {
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState<any>(null);
+  const [selectedDate, setSelectedDate] = useState("");
   const contactPhone = "0819546586";
-  const contactName = "AutoRent";
-  
-  const empties = Array.from({ length: startDay }, (_, i) => i);
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const contactName = "AutoRent Pro";
 
-  const handleDateClick = (vehicle: any, dateStr: string, status: any) => {
-    if (status.status === "available") {
-      setSelectedVehicle(vehicle);
-      setSelectedDate(dateStr);
-    }
+  const availableVehicles = vehicles.filter((v: any) => v.status !== "maintenance");
+
+  const isDateAvailable = (vehicleId: string, date: string) => {
+    const activeRental = rentals.find((r: any) => 
+      r.vehicle_id === vehicleId && 
+      r.status === "active" && 
+      r.start_date <= date && 
+      r.end_date >= date
+    );
+    return !activeRental;
+  };
+
+  const handleBooking = (vehicle: any) => {
+    const msg = `Xin chào! Tôi muốn đặt xe ${vehicle.name} (${vehicle.plate})`;
+    window.open(`https://zalo.me/${contactPhone}?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-      <header className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-8 sm:py-12">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center gap-4">
-            <Car className="w-10 h-10 sm:w-12 sm:h-12" />
-            <div>
-              <h1 className="text-2xl sm:text-4xl font-bold mb-2">🚗 AutoRent - Đặt xe nhanh chóng</h1>
-              <p className="text-blue-100 text-sm sm:text-lg">Chọn ngày trống để xem giá và đặt xe ngay</p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+          <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            {contactName}
+          </h1>
+          <p className="text-center text-gray-600 mb-4">Chọn xe và xem giá thuê</p>
+          <div className="flex justify-center gap-4 text-sm">
+            <a href={`tel:${contactPhone}`} className="flex items-center gap-1 text-blue-600 hover:underline">
+              <Phone className="w-4 h-4" />{contactPhone}
+            </a>
           </div>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
-        <div className="flex items-center justify-center gap-4 mb-6 bg-white rounded-xl shadow-lg p-4">
-          <button 
-            onClick={() => setMonth(new Date(year, monthNum - 1, 1))} 
-            className="p-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
-          >
-            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">Tháng {monthNum + 1}/{year}</h2>
-          <button 
-            onClick={() => setMonth(new Date(year, monthNum + 1, 1))} 
-            className="p-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
-          >
-            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
-        </div>
-
-        <div className="space-y-6 sm:space-y-8">
-          {vehicles.filter((v: any) => v.status !== 'maintenance').map((vehicle: any) => (
-            <div key={vehicle.id} className="bg-white rounded-2xl shadow-xl p-4 sm:p-8 hover:shadow-2xl transition">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 pb-6 border-b-2 border-gray-100 gap-4">
-                <div className="flex items-center gap-4">
-                  <span className="text-4xl sm:text-6xl">{vehicle.image}</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {availableVehicles.map((v: any) => (
+            <div 
+              key={v.id} 
+              className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition cursor-pointer"
+              onClick={() => setSelectedVehicle(v)}
+            >
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-5xl">{v.image}</span>
                   <div>
-                    <h3 className="text-2xl sm:text-3xl font-bold text-gray-800">{vehicle.name}</h3>
-                    <p className="text-gray-600 text-sm sm:text-lg">{vehicle.plate} • {vehicle.type} • {vehicle.seats} chỗ</p>
+                    <h3 className="font-bold text-lg">{v.name}</h3>
+                    <p className="text-gray-500 text-sm">{v.plate}</p>
                   </div>
                 </div>
-                <div className="text-left sm:text-right">
-                  <p className="text-xs sm:text-sm text-gray-600 mb-1">Giá từ</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-blue-600">{formatNumber(vehicle.price_day)}đ/ngày</p>
+                
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Giá/ngày:</span>
+                    <span className="font-bold text-blue-600">{formatNumber(v.price_day)}đ</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Giá/tuần:</span>
+                    <span className="font-bold text-green-600">{formatNumber(v.price_week)}đ</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Giá/tháng:</span>
+                    <span className="font-bold text-purple-600">{formatNumber(v.price_month)}đ</span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-7 gap-2 sm:gap-3">
-                {dayNames.map(day => (
-                  <div key={day} className="text-center font-bold text-gray-700 py-2 text-xs sm:text-lg">
-                    {day}
-                  </div>
-                ))}
-                
-                {empties.map(i => <div key={`empty-${i}`} />)}
-                
-                {days.map(day => {
-                  const dateStr = `${year}-${String(monthNum + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                  const status = getVehicleStatus(vehicle.id, dateStr);
-                  const isToday = dateStr === today;
-                  const isPast = dateStr < today;
-                  
-                  return (
-                    <button
-                      key={day}
-                      onClick={() => handleDateClick(vehicle, dateStr, status)}
-                      disabled={status.status === 'rented' || isPast}
-                      className={`border-2 rounded-xl p-2 sm:p-4 min-h-[60px] sm:min-h-[110px] transition-all ${
-                        isToday ? 'border-blue-600 border-4' : 'border-gray-200'
-                      } ${
-                        isPast ? 'bg-gray-100 cursor-not-allowed opacity-50' :
-                        status.status === 'available' ? 'bg-green-50 hover:bg-green-100 hover:scale-105 cursor-pointer shadow-md hover:shadow-xl' : 
-                        'bg-red-50 cursor-not-allowed'
-                      }`}
-                    >
-                      <p className="text-lg sm:text-2xl font-bold mb-1 sm:mb-2 text-gray-800">{day}</p>
-                      <p className={`text-xs sm:text-sm font-bold ${
-                        isPast ? 'text-gray-500' :
-                        status.status === 'available' ? 'text-green-700' : 'text-red-700'
-                      }`}>
-                        {isPast ? '⏮️' : status.status === 'available' ? '✅ Trống' : '🔄 Thuê'}
-                      </p>
-                      {status.time && !isPast && (
-                        <p className="text-[10px] sm:text-xs text-orange-600 font-bold mt-1">
-                          Trả: {status.time}
-                        </p>
-                      )}
-                    </button>
-                  );
-                })}
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleBooking(v); }}
+                  className="w-full mt-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-600"
+                >
+                  Đặt ngay qua Zalo
+                </button>
               </div>
             </div>
           ))}
         </div>
-
-        {selectedVehicle && selectedDate && (
-          <Modal onClose={() => { setSelectedVehicle(null); setSelectedDate(null); }} title={selectedVehicle.name}>
-            <p className="text-gray-600 text-sm mb-4">Ngày: {formatDate(selectedDate)}</p>
-            <div className="space-y-3 mb-6">
-              <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border-2 border-blue-300">
-                <p className="text-sm text-gray-700 mb-1 font-semibold">💰 Giá thuê theo ngày</p>
-                <p className="text-3xl sm:text-4xl font-bold text-blue-600">
-                  {formatNumber(selectedVehicle.price_day)}đ<span className="text-xl">/ngày</span>
-                </p>
-              </div>
-              <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl border-2 border-green-300">
-                <p className="text-sm text-gray-700 mb-1 font-semibold">📅 Giá thuê theo tuần</p>
-                <p className="text-3xl sm:text-4xl font-bold text-green-600">
-                  {formatNumber(selectedVehicle.price_week)}đ<span className="text-xl">/tuần</span>
-                </p>
-              </div>
-              <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl border-2 border-purple-300">
-                <p className="text-sm text-gray-700 mb-1 font-semibold">📆 Giá thuê theo tháng</p>
-                <p className="text-3xl sm:text-4xl font-bold text-purple-600">
-                  {formatNumber(selectedVehicle.price_month)}đ<span className="text-xl">/tháng</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <a 
-                href={`https://zalo.me/${contactPhone}?text=Xin chào, tôi muốn thuê xe ${selectedVehicle.name} (${selectedVehicle.plate}) vào ngày ${formatDate(selectedDate)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-xl text-center font-bold hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition text-base sm:text-lg"
-              >
-                💬 Đặt xe qua Zalo
-              </a>
-              <a 
-                href={`tel:${contactPhone}`}
-                className="block w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 rounded-xl text-center font-bold hover:from-green-700 hover:to-green-800 shadow-lg hover:shadow-xl transition text-base sm:text-lg flex items-center justify-center gap-2"
-              >
-                <Phone className="w-5 h-5" />
-                Gọi ngay: {contactPhone}
-              </a>
-            </div>
-
-            <div className="mt-6 pt-6 border-t-2 border-gray-100">
-              <p className="text-sm text-gray-600 text-center">
-                🚗 {selectedVehicle.seats} chỗ • {selectedVehicle.transmission} • {selectedVehicle.fuel}
-              </p>
-            </div>
-          </Modal>
-        )}
-      </main>
-
-      <footer className="bg-gray-800 text-white py-8 mt-16">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-lg font-semibold mb-2">🚗 AutoRent Pro - Cho thuê xe uy tín</p>
-          <p className="text-gray-400">Liên hệ: {contactPhone} • {contactName}</p>
-        </div>
-      </footer>
+      </div>
     </div>
   );
 }
 
 // ===== MAIN APP =====
 export default function App() {
-  const savedSession = localStorage.getItem('autorent_session');
-  const initialSession = savedSession ? JSON.parse(savedSession) : null;
-  
-  const [showBookingView, setShowBookingView] = useState(false);
-  const [isAuth, setIsAuth] = useState(!!initialSession);
-  const [user, setUser] = useState<any>(initialSession);
-  const [loginForm, setLoginForm] = useState({ u: "", p: "" });
-  const [loginError, setLoginError] = useState("");
+  const [user, setUser] = useState<any>(null);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [tab, setTab] = useState("dashboard");
-  const [month, setMonth] = useState(new Date());
-  const [toast, setToast] = useState<any>(null);
+  const [vehicles, setVehicles] = useState<any>([]);
+  const [rentals, setRentals] = useState<any>([]);
+  const [customers, setCustomers] = useState<any>([]);
+  const [expenses, setExpenses] = useState<any>([]);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<any>(null);
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
-  
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [rentals, setRentals] = useState<any[]>([]);
-  const [expenses, setExpenses] = useState<any[]>([]);
-  const [dataLoaded, setDataLoaded] = useState(false);
 
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('view') === 'booking') {
-      setShowBookingView(true);
-      loadAll();
-    }
-  }, []);
-
-  const loadAll = useCallback(() => {
-    setLoading(true);
-    dbLoad('vehicles', (d: any) => setVehicles(d), 'created_at');
-    dbLoad('customers', (d: any) => setCustomers(d), 'created_at');
-    dbLoad('rentals', (d: any) => setRentals(d), 'created_at');
-    dbLoad('expenses', (d: any) => { 
-      setExpenses(d); 
-      setLoading(false); 
-      setDataLoaded(true); 
-    }, 'created_at');
-  }, []);
-
-  useEffect(() => {
-    if (isAuth && !dataLoaded && !showBookingView) {
-      loadAll();
-    }
-  }, [isAuth, dataLoaded, loadAll, showBookingView]);
-
-  const notify = useCallback((msg: string, type = "success") => {
+  const notify = (msg: string, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  // Check public booking view
+  const urlParams = new URLSearchParams(window.location.search);
+  const isPublicBooking = urlParams.get("view") === "booking";
+
+  // Load session
+  useEffect(() => {
+    const savedUser = localStorage.getItem("autorent_user");
+    if (savedUser) setUser(JSON.parse(savedUser));
   }, []);
 
-  const hasPerm = useCallback((p: string) => user && (PERMISSIONS[user.role] || []).includes(p), [user]);
-  const canWrite = useCallback((p: string) => user && (WRITE_PERMS[p] || []).includes(user.role), [user]);
+  // Load data
+  useEffect(() => {
+    if (!user && !isPublicBooking) return;
+    setLoading(true);
+    Promise.all([
+      new Promise((res) => dbLoad('vehicles', res)),
+      new Promise((res) => dbLoad('rentals', res)),
+      new Promise((res) => dbLoad('customers', res)),
+      new Promise((res) => dbLoad('expenses', res))
+    ]).then(([v, r, c, e]) => {
+      setVehicles(v);
+      setRentals(r);
+      setCustomers(c);
+      setExpenses(e);
+      setLoading(false);
+    });
+  }, [user, isPublicBooking]);
+
+  const login = () => {
+    const foundUser = DEMO_USERS.find((u) => u.username === username);
+    if (!foundUser || DEMO_PASSWORDS[username] !== password) {
+      notify("❌ Sai thông tin đăng nhập!", "error");
+      return;
+    }
+    setUser(foundUser);
+    localStorage.setItem("autorent_user", JSON.stringify(foundUser));
+    notify("✅ Đăng nhập thành công!");
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("autorent_user");
+    setTab("dashboard");
+  };
+
+  const canView = (t: string) => PERMISSIONS[user?.role]?.includes(t);
+  const canWrite = (resource: string) => WRITE_PERMS[resource]?.includes(user?.role);
 
   const vMap = useMemo(() => {
-    const m: any = {};
-    vehicles.forEach(v => m[v.id] = v);
-    return m;
+    const map: any = {};
+    vehicles.forEach((v: any) => { map[v.id] = v; });
+    return map;
   }, [vehicles]);
 
-  const cMap = useMemo(() => {
-    const m: any = {};
-    customers.forEach(c => m[c.id] = c);
-    return m;
-  }, [customers]);
+  const customerName = useCallback((id: string) => customers.find((c: any) => c.id === id)?.name || "—", [customers]);
+  const vehicleName = useCallback((id: string) => vMap[id]?.name || "—", [vMap]);
+  const vehiclePlate = useCallback((id: string) => vMap[id]?.plate || "—", [vMap]);
 
-  const vehicleName = useCallback((id: string) => (vMap[id] || {}).name || "", [vMap]);
-  const vehiclePlate = useCallback((id: string) => (vMap[id] || {}).plate || "", [vMap]);
-  const customerName = useCallback((id: string) => (cMap[id] || {}).name || "", [cMap]);
-
-  const checkOverlap = useCallback((vid: string, sd: string, ed: string, excludeId?: string) => {
-    return rentals.some(r => 
-      r.vehicle_id === vid && 
-      r.status === "active" && 
-      r.id !== excludeId && 
-      r.start_date <= ed && 
-      r.end_date >= sd
-    );
+  // ⚠️ CHECK OVERLAP FUNCTION - KHÔNG CHO ĐẶT TRÙNG LỊCH
+  const checkOverlap = useCallback((vehicleId: string, startDate: string, endDate: string, excludeId?: string) => {
+    return rentals.some((r: any) => {
+      if (r.vehicle_id !== vehicleId) return false;
+      if (r.status !== "active") return false;
+      if (excludeId && r.id === excludeId) return false; // Bỏ qua chính hợp đồng đang sửa
+      
+      // Check overlap
+      return !(endDate < r.start_date || startDate > r.end_date);
+    });
   }, [rentals]);
 
-  const getVehicleStatus = useCallback((vid: string, date: string) => {
-    const rental = rentals.find(r => 
-      r.vehicle_id === vid && 
-      r.status === "active" && 
-      r.start_date <= date && 
-      r.end_date >= date
-    );
-    if (!rental) return { status: "available", time: null, rental: null };
-    return { status: "rented", time: date === rental.end_date ? rental.end_time : null, rental };
-  }, [rentals]);
-
-  const handleLogin = () => {
-    if (!loginForm.u || !loginForm.p) {
-      setLoginError("Vui lòng nhập đầy đủ");
-      return;
-    }
-    
-    const foundUser = DEMO_USERS.find(u => u.username === loginForm.u);
-    if (!foundUser || DEMO_PASSWORDS[loginForm.u] !== loginForm.p) {
-      setLoginError("Sai tên đăng nhập hoặc mật khẩu");
-      return;
-    }
-    
-    localStorage.setItem('autorent_session', JSON.stringify(foundUser));
-    setUser(foundUser);
-    setIsAuth(true);
-    setLoginError("");
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('autorent_session');
-    setIsAuth(false);
-    setUser(null);
-    setDataLoaded(false);
-  };
-
-  if (showBookingView) {
-    return (
-      <>
-        <Toast toast={toast} />
-        {loading && <Spinner />}
-        <PublicBookingView 
-          vehicles={vehicles} 
-          rentals={rentals} 
-          getVehicleStatus={getVehicleStatus} 
-          customerName={customerName} 
-          month={month} 
-          setMonth={setMonth}
-        />
-      </>
-    );
+  if (isPublicBooking) {
+    return <PublicBookingView vehicles={vehicles} rentals={rentals} />;
   }
 
-  if (!isAuth) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-              <Car className="w-8 h-8 text-blue-600" />
-            </div>
-            <h1 className="text-3xl font-bold text-gray-800">AutoRent Pro</h1>
-            <p className="text-gray-500 mt-2">Quản lý cho thuê xe</p>
-          </div>
-          
+          <h1 className="text-3xl font-bold text-center mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            AutoRent Pro
+          </h1>
           <div className="space-y-4">
-            <FormInput 
-              label="Tên đăng nhập" 
-              value={loginForm.u} 
-              onChange={(v: string) => setLoginForm({ ...loginForm, u: v })} 
-              placeholder="Nhập tên đăng nhập"
-            />
-            <FormInput 
-              label="Mật khẩu" 
-              type="password" 
-              value={loginForm.p} 
-              onChange={(v: string) => setLoginForm({ ...loginForm, p: v })} 
-              placeholder="Nhập mật khẩu"
-            />
-            {loginError && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm">
-                {loginError}
-              </div>
-            )}
+            <FormInput label="Tài khoản" value={username} onChange={setUsername} placeholder="admin" />
+            <FormInput label="Mật khẩu" type="password" value={password} onChange={setPassword} placeholder="admin123" />
             <button 
-              onClick={handleLogin} 
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+              onClick={login} 
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-600"
             >
               Đăng nhập
             </button>
           </div>
-          
-          <div className="mt-6 space-y-3">
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <p className="font-semibold mb-2 text-sm text-blue-900">👑 Admin (Full quyền)</p>
-              <p className="text-xs text-blue-700">• admin / admin123</p>
-            </div>
-            
-            <div className="p-3 bg-green-50 rounded-lg">
-              <p className="font-semibold mb-2 text-sm text-green-900">👨‍💼 Nhân viên vận hành (Hợp đồng + Khách hàng)</p>
-              <p className="text-xs text-green-700">• nhanvien1 / staff123</p>
-              <p className="text-xs text-green-700">• nhanvien2 / staff123</p>
-            </div>
-            
-            <div className="p-3 bg-orange-50 rounded-lg">
-              <p className="font-semibold mb-2 text-sm text-orange-900">🤝 Đối tác (Chỉ xem)</p>
-              <p className="text-xs text-orange-700">• doitac1 / partner123</p>
-              <p className="text-xs text-orange-700">• doitac2 / partner123</p>
-            </div>
+          <div className="mt-6 text-sm text-gray-500 space-y-1">
+            <p>Demo: admin/admin123</p>
+            <p>Nhân viên: nhanvien1/staff123</p>
+            <p>Đối tác: doitac1/partner123</p>
           </div>
         </div>
       </div>
     );
   }
 
-  const tabs = [
-    { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard, perm: "dashboard" },
-    { id: "vehicles", label: "Xe", icon: Car, perm: "vehicles" },
-    { id: "rentals", label: "Hợp đồng", icon: DollarSign, perm: "rentals" },
-    { id: "customers", label: "Khách hàng", icon: Users, perm: "customers" },
-    { id: "expenses", label: "Chi phí", icon: Wrench, perm: "expenses" },
-    { id: "calendar", label: "Lịch", icon: Calendar, perm: "calendar" }
-  ].filter(t => hasPerm(t.perm));
+  const roleLabel = user.role === "admin" ? "Admin" : user.role === "staff" ? "Nhân viên" : "Đối tác";
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Toast toast={toast} />
       {loading && <Spinner />}
-      
-      <header className="bg-white border-b sticky top-0 z-30 shadow-sm">
+
+      <nav className="bg-white shadow-sm border-b sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Car className="w-7 h-7 text-blue-600" />
+            <Car className="w-6 h-6 text-blue-600" />
             <h1 className="text-xl font-bold">AutoRent Pro</h1>
+            <Badge color="blue">{roleLabel}</Badge>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2">
-              <span className="text-sm text-gray-600">{user.name}</span>
-              <Badge color={
-                user.role === "admin" ? "blue" : 
-                user.role === "staff" ? "green" : 
-                "orange"
-              }>
-                {user.role === "admin" ? "Admin" : 
-                 user.role === "staff" ? "Nhân viên" : 
-                 "Đối tác"}
-              </Badge>
-            </div>
-            <button 
-              onClick={handleLogout} 
-              className="flex items-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Đăng xuất</span>
-            </button>
-          </div>
+          <button 
+            onClick={logout} 
+            className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="hidden sm:inline">Đăng xuất</span>
+          </button>
         </div>
-      </header>
+      </nav>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm whitespace-nowrap transition ${
-                tab === t.id 
-                  ? "bg-blue-600 text-white shadow-lg" 
-                  : "bg-white text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              <t.icon className="w-4 h-4" />
-              {t.label}
+          {canView("dashboard") && (
+            <button onClick={() => setTab("dashboard")} className={`px-4 py-2 rounded-lg flex items-center gap-2 whitespace-nowrap ${tab === "dashboard" ? "bg-blue-600 text-white" : "bg-white"}`}>
+              <LayoutDashboard className="w-4 h-4" />Dashboard
             </button>
-          ))}
+          )}
+          {canView("vehicles") && (
+            <button onClick={() => setTab("vehicles")} className={`px-4 py-2 rounded-lg flex items-center gap-2 whitespace-nowrap ${tab === "vehicles" ? "bg-blue-600 text-white" : "bg-white"}`}>
+              <Car className="w-4 h-4" />Xe
+            </button>
+          )}
+          {canView("rentals") && (
+            <button onClick={() => setTab("rentals")} className={`px-4 py-2 rounded-lg flex items-center gap-2 whitespace-nowrap ${tab === "rentals" ? "bg-blue-600 text-white" : "bg-white"}`}>
+              <DollarSign className="w-4 h-4" />Hợp đồng
+            </button>
+          )}
+          {canView("customers") && (
+            <button onClick={() => setTab("customers")} className={`px-4 py-2 rounded-lg flex items-center gap-2 whitespace-nowrap ${tab === "customers" ? "bg-blue-600 text-white" : "bg-white"}`}>
+              <Users className="w-4 h-4" />Khách hàng
+            </button>
+          )}
+          {canView("expenses") && (
+            <button onClick={() => setTab("expenses")} className={`px-4 py-2 rounded-lg flex items-center gap-2 whitespace-nowrap ${tab === "expenses" ? "bg-blue-600 text-white" : "bg-white"}`}>
+              <Wrench className="w-4 h-4" />Chi phí
+            </button>
+          )}
+          {canView("calendar") && (
+            <button onClick={() => setTab("calendar")} className={`px-4 py-2 rounded-lg flex items-center gap-2 whitespace-nowrap ${tab === "calendar" ? "bg-blue-600 text-white" : "bg-white"}`}>
+              <Calendar className="w-4 h-4" />Lịch
+            </button>
+          )}
         </div>
 
-        {tab === "dashboard" && (
-          <DashboardTab 
-            rentals={rentals} 
-            expenses={expenses} 
-            vehicles={vehicles}
-            customerName={customerName} 
-            vehicleName={vehicleName}
-            dateRange={dateRange}
-            setDateRange={setDateRange}
-          />
-        )}
-        
-        {tab === "vehicles" && (
-          <VehiclesTab 
-            vehicles={vehicles} 
-            setVehicles={setVehicles}
-            rentals={rentals}
-            notify={notify}
-            setLoading={setLoading}
-            canWrite={canWrite}
-          />
-        )}
-        
-        {tab === "rentals" && (
-          <RentalsTab 
-            rentals={rentals}
-            vehicles={vehicles}
-            setVehicles={setVehicles}
-            setRentals={setRentals}
-            customers={customers}
-            checkOverlap={checkOverlap}
-            notify={notify}
-            setLoading={setLoading}
-            customerName={customerName}
-            vehicleName={vehicleName}
-            vehiclePlate={vehiclePlate}
-            vMap={vMap}
-            canWrite={canWrite}
-          />
-        )}
-        
-        {tab === "customers" && (
-          <CustomersTab 
-            customers={customers}
-            setCustomers={setCustomers}
-            rentals={rentals}
-            vehicleName={vehicleName}
-            notify={notify}
-            canWrite={canWrite}
-          />
-        )}
-        
-        {tab === "expenses" && (
-          <ExpensesTab 
-            expenses={expenses}
-            setExpenses={setExpenses}
-            vehicles={vehicles}
-            vMap={vMap}
-            notify={notify}
-            canWrite={canWrite}
-          />
-        )}
-        
-        {tab === "calendar" && (
-          <CalendarTab 
-            vehicles={vehicles} 
-            getVehicleStatus={getVehicleStatus} 
-            customerName={customerName}
-            month={month}
-            setMonth={setMonth}
-            notify={notify}
-          />
-        )}
+        {tab === "dashboard" && <DashboardTab rentals={rentals} expenses={expenses} vehicles={vehicles} customerName={customerName} vehicleName={vehicleName} dateRange={dateRange} setDateRange={setDateRange} />}
+        {tab === "vehicles" && <VehiclesTab vehicles={vehicles} setVehicles={setVehicles} rentals={rentals} notify={notify} setLoading={setLoading} canWrite={canWrite} />}
+        {tab === "rentals" && <RentalsTab rentals={rentals} vehicles={vehicles} setVehicles={setVehicles} setRentals={setRentals} customers={customers} checkOverlap={checkOverlap} notify={notify} setLoading={setLoading} customerName={customerName} vehicleName={vehicleName} vehiclePlate={vehiclePlate} vMap={vMap} canWrite={canWrite} />}
+        {tab === "customers" && <CustomersTab customers={customers} setCustomers={setCustomers} rentals={rentals} vehicleName={vehicleName} notify={notify} canWrite={canWrite} />}
+        {tab === "expenses" && <ExpensesTab expenses={expenses} setExpenses={setExpenses} vehicles={vehicles} notify={notify} vMap={vMap} vehicleName={vehicleName} canWrite={canWrite} />}
+        {tab === "calendar" && <CalendarTab vehicles={vehicles} rentals={rentals} vMap={vMap} />}
       </div>
     </div>
   );
