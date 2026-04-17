@@ -6,27 +6,40 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Types & Constants
+// ===== CONSTANTS & PERMISSIONS =====
 const PAGE_SIZE = 10;
+
+// Danh sách user demo
 const DEMO_USERS = [
   { id: "1", username: "admin", name: "Admin", role: "admin" },
-  { id: "2", username: "sale1", name: "Sale 1", role: "sale" },
-  { id: "3", username: "manager", name: "Manager", role: "manager" },
-  { id: "4", username: "accountant", name: "Kế toán", role: "accountant" }
+  { id: "2", username: "nhanvien1", name: "Nhân viên 1", role: "staff" },
+  { id: "3", username: "nhanvien2", name: "Nhân viên 2", role: "staff" },
+  { id: "4", username: "doitac1", name: "Đối tác ABC", role: "partner" },
+  { id: "5", username: "doitac2", name: "Đối tác XYZ", role: "partner" }
 ];
 
-const PERMISSIONS: any = {
-  admin: ["dashboard", "vehicles", "rentals", "customers", "expenses", "calendar"],
-  manager: ["dashboard", "vehicles", "rentals", "customers", "expenses", "calendar"],
-  sale: ["dashboard", "rentals", "customers", "calendar"],
-  accountant: ["dashboard", "expenses"]
+// Mật khẩu demo
+const DEMO_PASSWORDS: any = {
+  admin: "admin123",
+  nhanvien1: "staff123",
+  nhanvien2: "staff123",
+  doitac1: "partner123",
+  doitac2: "partner123"
 };
 
+// Quyền truy cập các tab (READ permission)
+const PERMISSIONS: any = {
+  admin: ["dashboard", "vehicles", "rentals", "customers", "expenses", "calendar"],
+  staff: ["dashboard", "rentals", "customers", "calendar"], // Nhân viên: chỉ làm việc với HĐ và KH
+  partner: ["dashboard", "vehicles", "rentals", "customers", "expenses", "calendar"] // Đối tác: xem tất cả
+};
+
+// Quyền ghi/sửa/xóa dữ liệu (WRITE permission)
 const WRITE_PERMS: any = {
-  vehicles: ["admin", "manager"],
-  rentals: ["admin", "manager", "sale"],
-  customers: ["admin", "manager", "sale"],
-  expenses: ["admin", "manager", "accountant"]
+  vehicles: ["admin"], // Chỉ admin quản lý xe
+  rentals: ["admin", "staff"], // Admin + Nhân viên tạo hợp đồng
+  customers: ["admin", "staff"], // Admin + Nhân viên quản lý khách hàng
+  expenses: ["admin"] // Chỉ admin quản lý chi phí
 };
 
 const EXP_OPTIONS = [
@@ -84,7 +97,7 @@ const dbDelete = (table: string, id: string, callback: (ok: boolean) => void) =>
     .then(({ error }) => callback(!error));
 };
 
-// UI Components
+// ===== UI COMPONENTS =====
 function Toast({ toast }: any) {
   if (!toast) return null;
   const bg = toast.type === "error" ? "bg-red-600" : "bg-green-600";
@@ -1272,7 +1285,7 @@ function CalendarTab({ vehicles, getVehicleStatus, customerName, month, setMonth
   );
 }
 
-// ===== PUBLIC BOOKING VIEW (NO LOGIN) =====
+// ===== PUBLIC BOOKING VIEW =====
 function PublicBookingView({ vehicles, rentals, getVehicleStatus, customerName, month, setMonth }: any) {
   const year = month.getFullYear();
   const monthNum = month.getMonth();
@@ -1452,7 +1465,7 @@ function PublicBookingView({ vehicles, rentals, getVehicleStatus, customerName, 
   );
 }
 
-// ===== MAIN APP COMPONENT =====
+// ===== MAIN APP =====
 export default function App() {
   const savedSession = localStorage.getItem('autorent_session');
   const initialSession = savedSession ? JSON.parse(savedSession) : null;
@@ -1550,9 +1563,9 @@ export default function App() {
       setLoginError("Vui lòng nhập đầy đủ");
       return;
     }
-    const passwords: any = { admin: "admin123", sale1: "sale123", manager: "manager123", accountant: "acc123" };
+    
     const foundUser = DEMO_USERS.find(u => u.username === loginForm.u);
-    if (!foundUser || passwords[loginForm.u] !== loginForm.p) {
+    if (!foundUser || DEMO_PASSWORDS[loginForm.u] !== loginForm.p) {
       setLoginError("Sai tên đăng nhập hoặc mật khẩu");
       return;
     }
@@ -1604,14 +1617,14 @@ export default function App() {
               label="Tên đăng nhập" 
               value={loginForm.u} 
               onChange={(v: string) => setLoginForm({ ...loginForm, u: v })} 
-              placeholder="admin / sale1 / manager / accountant"
+              placeholder="Nhập tên đăng nhập"
             />
             <FormInput 
               label="Mật khẩu" 
               type="password" 
               value={loginForm.p} 
               onChange={(v: string) => setLoginForm({ ...loginForm, p: v })} 
-              placeholder="••••••"
+              placeholder="Nhập mật khẩu"
             />
             {loginError && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm">
@@ -1626,12 +1639,23 @@ export default function App() {
             </button>
           </div>
           
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg text-xs text-gray-600">
-            <p className="font-semibold mb-2">Tài khoản demo:</p>
-            <p>• admin / admin123 (Full quyền)</p>
-            <p>• manager / manager123 (Quản lý)</p>
-            <p>• sale1 / sale123 (Nhân viên)</p>
-            <p>• accountant / acc123 (Kế toán)</p>
+          <div className="mt-6 space-y-3">
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <p className="font-semibold mb-2 text-sm text-blue-900">👑 Admin (Full quyền)</p>
+              <p className="text-xs text-blue-700">• admin / admin123</p>
+            </div>
+            
+            <div className="p-3 bg-green-50 rounded-lg">
+              <p className="font-semibold mb-2 text-sm text-green-900">👨‍💼 Nhân viên vận hành (Hợp đồng + Khách hàng)</p>
+              <p className="text-xs text-green-700">• nhanvien1 / staff123</p>
+              <p className="text-xs text-green-700">• nhanvien2 / staff123</p>
+            </div>
+            
+            <div className="p-3 bg-orange-50 rounded-lg">
+              <p className="font-semibold mb-2 text-sm text-orange-900">🤝 Đối tác (Chỉ xem)</p>
+              <p className="text-xs text-orange-700">• doitac1 / partner123</p>
+              <p className="text-xs text-orange-700">• doitac2 / partner123</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1659,7 +1683,18 @@ export default function App() {
             <h1 className="text-xl font-bold">AutoRent Pro</h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600 hidden sm:inline">{user.name}</span>
+            <div className="hidden sm:flex items-center gap-2">
+              <span className="text-sm text-gray-600">{user.name}</span>
+              <Badge color={
+                user.role === "admin" ? "blue" : 
+                user.role === "staff" ? "green" : 
+                "orange"
+              }>
+                {user.role === "admin" ? "Admin" : 
+                 user.role === "staff" ? "Nhân viên" : 
+                 "Đối tác"}
+              </Badge>
+            </div>
             <button 
               onClick={handleLogout} 
               className="flex items-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm"
