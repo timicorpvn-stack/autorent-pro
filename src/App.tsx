@@ -1469,24 +1469,24 @@ function CalendarTab({ vehicles, rentals, vMap }: any) {
   const nextMonth = () => setSelectedMonth(new Date(year, month + 1, 1));
 
   const getVehicleStatus = (vehicleId: string, dateStr: string) => {
-    const rental = rentals.find((r: any) => {
-      const start = new Date(r.start_date);
-      const end = new Date(r.end_date);
-      const check = new Date(dateStr);
-      return r.vehicle_id === vehicleId && r.status === "active" && check >= start && check <= end;
-    });
+  const rental = rentals.find((r: any) => {
+    const start = new Date(r.start_date);
+    const end = new Date(r.end_date);
+    const check = new Date(dateStr);
+    return r.vehicle_id === vehicleId && r.status === "active" && check >= start && check <= end;
+  });
 
-    if (!rental) return { status: "available", time: null };
-    
-    const checkDate = new Date(dateStr);
-    const endDate = new Date(rental.endDate);
-    
-    if (checkDate.toDateString() === endDate.toDateString()) {
-      return { status: "rented", time: rental.end_time };
-    }
-    
-    return { status: "rented", time: null };
-  };
+  if (!rental) return { status: "available", time: null };
+  
+  const checkDate = new Date(dateStr);
+  const endDate = new Date(rental.end_date); // ← SỬA: rental.end_date thay vì rental.endDate
+  
+  if (checkDate.toDateString() === endDate.toDateString()) {
+    return { status: "rented", time: rental.end_time };
+  }
+  
+  return { status: "rented", time: null };
+};
 
   const generateBookingLink = () => {
     const url = window.location.origin + window.location.pathname + "?view=booking";
