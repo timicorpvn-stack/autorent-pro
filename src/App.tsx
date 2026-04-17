@@ -1578,7 +1578,6 @@ function CalendarTab({ vehicles, rentals, vMap }: any) {
 }
 
 function PublicBookingView({ vehicles, rentals }: any) {
-  const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const contactPhone = "0819546586";
   const contactName = "AutoRent Pro";
@@ -1602,7 +1601,7 @@ function PublicBookingView({ vehicles, rentals }: any) {
     if (!rental) return { status: "available", time: null };
     
     const checkDate = new Date(dateStr);
-    const endDate = new Date(r.end_date);
+    const endDate = new Date(rental.end_date);
     
     if (checkDate.toDateString() === endDate.toDateString()) {
       return { status: "rented", time: rental.end_time };
@@ -1624,13 +1623,11 @@ function PublicBookingView({ vehicles, rentals }: any) {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
       <header className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Car className="w-12 h-12" />
-              <div>
-                <h1 className="text-4xl font-bold mb-2">🚗 {contactName}</h1>
-                <p className="text-blue-100 text-lg">Chọn ngày trống để đặt xe ngay</p>
-              </div>
+          <div className="flex items-center gap-4">
+            <Car className="w-12 h-12" />
+            <div>
+              <h1 className="text-4xl font-bold mb-2">🚗 {contactName}</h1>
+              <p className="text-blue-100 text-lg">Chọn ngày trống để đặt xe ngay</p>
             </div>
           </div>
         </div>
@@ -1655,7 +1652,7 @@ function PublicBookingView({ vehicles, rentals }: any) {
                   <span className="text-6xl">{vehicle.image}</span>
                   <div>
                     <h3 className="text-3xl font-bold text-gray-800">{vehicle.name}</h3>
-                    <p className="text-gray-600 text-lg">{vehicle.plate} • {vehicle.type} • {vehicle.seats} chỗ • {vehicle.transmission}</p>
+                    <p className="text-gray-600 text-lg">{vehicle.plate} • {vehicle.type} • {vehicle.seats} chỗ</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -1685,9 +1682,9 @@ function PublicBookingView({ vehicles, rentals }: any) {
                   return (
                     <button
                       key={date}
-                      onClick={() => handleDateClick(vehicle, dateStr, vehicleStatus.status)}
+                      onClick={() => !isPast && vehicleStatus.status === 'available' && handleDateClick(vehicle, dateStr, vehicleStatus.status)}
                       disabled={vehicleStatus.status === 'rented' || isPast}
-                      className={`border-3 rounded-xl p-4 min-h-[110px] transition-all ${
+                      className={`border-2 rounded-xl p-4 min-h-[110px] transition-all ${
                         isToday ? 'border-blue-600 border-4' : 'border-gray-200'
                       } ${
                         isPast ? 'bg-gray-100 cursor-not-allowed opacity-50' :
@@ -1700,11 +1697,11 @@ function PublicBookingView({ vehicles, rentals }: any) {
                         isPast ? 'text-gray-500' :
                         vehicleStatus.status === 'available' ? 'text-green-700' : 'text-red-700'
                       }`}>
-                        {isPast ? '⏮️ Qua rồi' : vehicleStatus.status === 'available' ? '✅ Trống' : '🔄 Đã thuê'}
+                        {isPast ? '⏮️ Qua' : vehicleStatus.status === 'available' ? '✅ Trống' : '🔄 Thuê'}
                       </p>
                       {vehicleStatus.time && !isPast && (
                         <p className="text-xs text-orange-600 font-bold mt-1">
-                          Trả: {vehicleStatus.time}
+                          {vehicleStatus.time}
                         </p>
                       )}
                     </button>
