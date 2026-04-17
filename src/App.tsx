@@ -729,7 +729,7 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
   
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const customerOptions = customers.map((c: any) => ({ value: c.id, label: c.name + " — " + c.phone }));
-  const vehicleOptions = vehicles.filter((v: any) => v.status === "available").map((v: any) => ({ value: v.id, label: v.name + " — " + v.plate }));
+  const vehicleOptions = vehicles.map((v: any) => ({ value: v.id, label: v.name + " — " + v.plate }));
 
   return (
     <div className="space-y-4">
@@ -1468,15 +1468,24 @@ function CalendarTab({ vehicles, rentals, vMap }: any) {
   const prevMonth = () => setSelectedMonth(new Date(year, month - 1, 1));
   const nextMonth = () => setSelectedMonth(new Date(year, month + 1, 1));
 
-  const getVehicleStatus = (vehicleId: string, date: Date) => {
-    const dateStr = date.toISOString().split("T")[0];
-    const activeRental = rentals.find((r: any) => 
-      r.vehicle_id === vehicleId && 
-      r.status === "active" && 
-      r.start_date <= dateStr && 
-      r.end_date >= dateStr
-    );
-    return activeRental ? "rented" : "available";
+  const getVehicleStatus = (vehicleId: string, dateStr: string) => {
+    const rental = rentals.find((r: any) => {
+      const start = new Date(r.start_date);
+      const end = new Date(r.end_date);
+      const check = new Date(dateStr);
+      return r.vehicle_id === vehicleId && r.status === "active" && check >= start && check <= end;
+    });
+
+    if (!rental) return { status: "available", time: null };
+    
+    const checkDate = new Date(dateStr);
+    const endDate = new Date(rental.endDate);
+    
+    if (checkDate.toDateString() === endDate.toDateString()) {
+      return { status: "rented", time: rental.end_time };
+    }
+    
+    return { status: "rented", time: null };
   };
 
   const generateBookingLink = () => {
@@ -1514,34 +1523,49 @@ function CalendarTab({ vehicles, rentals, vMap }: any) {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border p-4">
-        <div className="grid grid-cols-7 gap-1 mb-2 text-xs font-semibold text-gray-600">
-          {["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map((d) => (
-            <div key={d} className="text-center py-2">{d}</div>
-          ))}
-        </div>
-
+      <div className="space-y-6">
         {vehicles.filter((v: any) => v.status !== "maintenance").map((vehicle: any) => (
-          <div key={vehicle.id} className="mb-4 pb-4 border-b last:border-0">
-            <h3 className="font-semibold mb-2 text-sm">{vehicle.name} - {vehicle.plate}</h3>
-            <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: firstDay }).map((_, i) => (
-                <div key={`empty-${i}`} className="aspect-square" />
+          <div key={vehicle.id} className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-4xl">{vehicle.image}</span>
+              <div>
+                <h3 className="font-semibold text-lg">{vehicle.name}</h3>
+                <p className="text-sm text-gray-600">{vehicle.plate} • {vehicle.type}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2">
+              {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map(day => (
+                <div key={day} className="text-center font-semibold text-sm text-gray-600 py-2">
+                  {day}
+                </div>
               ))}
+              
+              {Array.from({ length: firstDay }).map((_, i) => (
+                <div key={`empty-${i}`}></div>
+              ))}
+              
               {Array.from({ length: daysInMonth }).map((_, i) => {
-                const day = i + 1;
-                const date = new Date(year, month, day);
-                const status = getVehicleStatus(vehicle.id, date);
-                const bgColor = status === "available" ? "bg-green-100" : "bg-orange-100";
-                const icon = status === "available" ? "✅" : "🔄";
+                const date = i + 1;
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+                const vehicleStatus = getVehicleStatus(vehicle.id, dateStr);
+                const isToday = new Date().toDateString() === new Date(dateStr).toDateString();
                 
                 return (
-                  <div
-                    key={day}
-                    className={`aspect-square ${bgColor} rounded flex flex-col items-center justify-center text-xs`}
-                  >
-                    <span className="text-xs">{icon}</span>
-                    <span className="font-medium">{day}</span>
+                  <div key={date} className={`border-2 rounded-lg p-2 min-h-[70px] ${
+                    isToday ? 'border-blue-600' : 'border-gray-200'
+                  } ${
+                    vehicleStatus.status === 'available' ? 'bg-green-50' : 'bg-red-50'
+                  }`}>
+                    <p className="text-sm font-semibold mb-1">{date}</p>
+                    <p className={`text-xs ${vehicleStatus.status === 'available' ? 'text-green-700' : 'text-red-700'}`}>
+                      {vehicleStatus.status === 'available' ? '✅ Trống' : '🔄 Thuê'}
+                    </p>
+                    {vehicleStatus.time && (
+                      <p className="text-xs text-orange-600 font-semibold mt-1">
+                        {vehicleStatus.time}
+                      </p>
+                    )}
                   </div>
                 );
               })}
@@ -1552,7 +1576,6 @@ function CalendarTab({ vehicles, rentals, vMap }: any) {
     </div>
   );
 }
-
 function PublicBookingView({ vehicles, rentals }: any) {
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState("");
