@@ -198,10 +198,10 @@ function Badge({ children, color = "blue" }: any) {
 
 function StatCard({ icon: Icon, label, value, color }: any) {
   return (
-    <div className={`bg-gradient-to-br ${color} rounded-xl p-6 shadow-lg text-white`}>
-      <Icon className="w-8 h-8 mb-3 opacity-90" />
-      <p className="text-sm opacity-90 mb-1">{label}</p>
-      <p className="text-3xl font-bold">{value}</p>
+    <div className={`bg-gradient-to-br ${color} rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-lg text-white`}>
+      <Icon className="w-6 h-6 sm:w-8 sm:h-8 mb-2 sm:mb-3 opacity-90" />
+      <p className="text-xs sm:text-sm opacity-90 mb-1">{label}</p>
+      <p className="text-xl sm:text-3xl font-bold truncate">{value}</p>
     </div>
   );
 }
