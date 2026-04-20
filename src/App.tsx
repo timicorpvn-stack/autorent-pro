@@ -241,7 +241,8 @@ function DashboardTab({ rentals, expenses, vehicles, customerName, vehicleName, 
     ? expenses.filter((e: any) => e.date >= dateRange.from && e.date <= dateRange.to)
     : expenses;
 
-  const revenue = filteredRentals.reduce((s: number, r: any) => s + r.paid, 0);
+  // ✅ SỬA: Doanh thu = total + surcharge (không dùng paid)
+  const revenue = filteredRentals.reduce((s: number, r: any) => s + (r.total + (r.surcharge || 0)), 0);
   const totalExpenses = filteredExpenses.reduce((s: number, e: any) => s + e.amount, 0);
   const profit = revenue - totalExpenses;
 
@@ -250,7 +251,8 @@ function DashboardTab({ rentals, expenses, vehicles, customerName, vehicleName, 
     const vehicleRentals = filteredRentals.filter((r: any) => r.vehicle_id === vehicle.id);
     const vehicleExpenses = filteredExpenses.filter((e: any) => e.vehicle_id === vehicle.id);
     
-    const vehicleRevenue = vehicleRentals.reduce((s: number, r: any) => s + r.paid, 0);
+    // ✅ SỬA: Doanh thu xe = total + surcharge
+    const vehicleRevenue = vehicleRentals.reduce((s: number, r: any) => s + (r.total + (r.surcharge || 0)), 0);
     const vehicleExpense = vehicleExpenses.reduce((s: number, e: any) => s + e.amount, 0);
     const vehicleProfit = vehicleRevenue - vehicleExpense;
     const tripCount = vehicleRentals.length;
@@ -262,49 +264,94 @@ function DashboardTab({ rentals, expenses, vehicles, customerName, vehicleName, 
       profit: vehicleProfit,
       tripCount
     };
-  }).sort((a, b) => b.profit - a.profit); // Sắp xếp theo lợi nhuận cao nhất
+  }).sort((a, b) => b.profit - a.profit);
 
   return (
-    <div className="space-y-6">
-      {/* Date Filter */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <FormInput 
-          label="Từ ngày" 
-          type="date" 
-          value={dateRange.from} 
-          onChange={(v: string) => setDateRange({ ...dateRange, from: v })} 
-          className="w-40"
-        />
-        <FormInput 
-          label="Đến ngày" 
-          type="date" 
-          value={dateRange.to} 
-          onChange={(v: string) => setDateRange({ ...dateRange, to: v })} 
-          className="w-40"
-        />
-        <button 
-          onClick={() => setDateRange({ from: "", to: "" })} 
-          className="bg-gray-200 px-3 py-2 rounded-lg text-sm mt-6"
-        >
-          Xóa lọc
-        </button>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Date Filter - Mobile Optimized */}
+      <div className="bg-white rounded-lg shadow-sm border p-3 sm:p-4">
+        <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-2 gap-2">
+            <FormInput 
+              label="Từ ngày" 
+              type="date" 
+              value={dateRange.from} 
+              onChange={(v: string) => setDateRange({ ...dateRange, from: v })} 
+              className="w-full"
+            />
+            <FormInput 
+              label="Đến ngày" 
+              type="date" 
+              value={dateRange.to} 
+              onChange={(v: string) => setDateRange({ ...dateRange, to: v })} 
+              className="w-full"
+            />
+          </div>
+          <button 
+            onClick={() => setDateRange({ from: "", to: "" })} 
+            className="bg-gray-200 px-3 py-2 rounded-lg text-sm hover:bg-gray-300 w-full"
+          >
+            Xóa lọc
+          </button>
+        </div>
       </div>
 
-      {/* Tổng quan */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Tổng quan - Mobile Optimized */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard icon={DollarSign} label="Doanh thu" value={formatNumber(revenue) + "đ"} color="from-green-500 to-green-600" />
         <StatCard icon={TrendingUp} label="Chi phí" value={formatNumber(totalExpenses) + "đ"} color="from-red-500 to-red-600" />
         <StatCard icon={DollarSign} label="Lợi nhuận" value={formatNumber(profit) + "đ"} color="from-blue-500 to-blue-600" />
         <StatCard icon={Car} label="Đang thuê" value={activeRentals.length} color="from-orange-500 to-orange-600" />
       </div>
 
-      {/* Thống kê từng xe */}
-      <div className="bg-white rounded-xl shadow-sm border p-6">
-        <h3 className="font-bold mb-4 flex items-center gap-2 text-lg">
-          <Car className="w-5 h-5" />
+      {/* Thống kê từng xe - Mobile Optimized */}
+      <div className="bg-white rounded-xl shadow-sm border p-3 sm:p-6">
+        <h3 className="font-bold mb-3 sm:mb-4 flex items-center gap-2 text-base sm:text-lg">
+          <Car className="w-4 h-4 sm:w-5 sm:h-5" />
           Thống kê theo xe
         </h3>
-        <div className="overflow-x-auto">
+        
+        {/* Mobile: Card Layout */}
+        <div className="block sm:hidden space-y-3">
+          {vehicleStats.map((v: any) => (
+            <div key={v.id} className="border rounded-lg p-3 bg-gray-50">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-2xl">{v.image}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{v.name}</p>
+                  <p className="text-xs text-gray-500">{v.plate}</p>
+                </div>
+                <Badge color={v.status === "available" ? "green" : v.status === "rented" ? "orange" : "red"}>
+                  {v.status === "available" ? "Sẵn" : v.status === "rented" ? "Thuê" : "Bảo trì"}
+                </Badge>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white p-2 rounded">
+                  <p className="text-gray-500 mb-1">Chuyến</p>
+                  <p className="font-bold text-sm">{v.tripCount}</p>
+                </div>
+                <div className="bg-white p-2 rounded">
+                  <p className="text-gray-500 mb-1">Doanh thu</p>
+                  <p className="font-bold text-sm text-green-600">{formatNumber(v.revenue)}đ</p>
+                </div>
+                <div className="bg-white p-2 rounded">
+                  <p className="text-gray-500 mb-1">Chi phí</p>
+                  <p className="font-bold text-sm text-red-600">{formatNumber(v.expense)}đ</p>
+                </div>
+                <div className="bg-white p-2 rounded">
+                  <p className="text-gray-500 mb-1">Lợi nhuận</p>
+                  <p className={`font-bold text-sm ${v.profit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                    {formatNumber(v.profit)}đ
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop: Table Layout */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
@@ -350,7 +397,7 @@ function DashboardTab({ rentals, expenses, vehicles, customerName, vehicleName, 
             </tbody>
             <tfoot className="bg-gray-50 font-bold">
               <tr>
-                <td className="px-4 py-3">TỔNG CỘNG</td>
+                <td className="px-4 py-3">TỔNG</td>
                 <td className="px-4 py-3 text-right">{filteredRentals.length}</td>
                 <td className="px-4 py-3 text-right text-green-600">{formatNumber(revenue)}đ</td>
                 <td className="px-4 py-3 text-right text-red-600">{formatNumber(totalExpenses)}đ</td>
@@ -363,26 +410,26 @@ function DashboardTab({ rentals, expenses, vehicles, customerName, vehicleName, 
       </div>
 
       {/* Hợp đồng đang hoạt động */}
-      <div className="bg-white rounded-xl shadow-sm border p-6">
-        <h3 className="font-bold mb-4 flex items-center gap-2">
-          <Calendar className="w-5 h-5" />
+      <div className="bg-white rounded-xl shadow-sm border p-3 sm:p-6">
+        <h3 className="font-bold mb-3 sm:mb-4 flex items-center gap-2 text-base sm:text-lg">
+          <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
           Hợp đồng đang hoạt động ({activeRentals.length})
         </h3>
-        <div className="space-y-2">
+        <div className="space-y-2 sm:space-y-3">
           {activeRentals.map((r: any) => (
-            <div key={r.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <div>
-                <p className="font-medium text-sm">{vehicleName(r.vehicle_id)}</p>
-                <p className="text-xs text-gray-500">{customerName(r.customer_id)}</p>
+            <div key={r.id} className="flex justify-between items-center p-2 sm:p-3 bg-gray-50 rounded-lg">
+              <div className="min-w-0 flex-1 mr-2">
+                <p className="font-medium text-xs sm:text-sm truncate">{vehicleName(r.vehicle_id)}</p>
+                <p className="text-[10px] sm:text-xs text-gray-500 truncate">{customerName(r.customer_id)}</p>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">{formatDate(r.start_date)} → {formatDate(r.end_date)}</p>
-                <p className="text-sm font-semibold text-green-600">{formatNumber(r.total)}đ</p>
+              <div className="text-right flex-shrink-0">
+                <p className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">{formatDate(r.start_date)} → {formatDate(r.end_date)}</p>
+                <p className="text-xs sm:text-sm font-semibold text-green-600 whitespace-nowrap">{formatNumber(r.total)}đ</p>
               </div>
             </div>
           ))}
           {activeRentals.length === 0 && (
-            <p className="text-center text-gray-400 py-4 text-sm">Không có hợp đồng nào đang hoạt động</p>
+            <p className="text-center text-gray-400 py-4 text-xs sm:text-sm">Không có hợp đồng đang hoạt động</p>
           )}
         </div>
       </div>
