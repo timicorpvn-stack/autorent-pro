@@ -668,7 +668,6 @@ function VehiclesTab({ vehicles, setVehicles, rentals, notify, setLoading, canWr
     </div>
   );
 }
-// ===== RENTALS TAB WITH OVERLAP CHECK =====
 function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, checkOverlap, notify, setLoading, customerName, vehicleName, vehiclePlate, vMap, canWrite }: any) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -714,7 +713,6 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
     else if (form.start_date && form.end_date <= form.start_date) e.end_date = "Phải sau ngày nhận";
     if (!form.odo_start) e.odo_start = "Nhập ODO";
     
-    // ⚠️ CHECK TRÙNG LỊCH
     if (form.vehicle_id && form.start_date && form.end_date && !e.end_date) {
       if (checkOverlap(form.vehicle_id, form.start_date, form.end_date)) {
         e.vehicle_id = "⚠️ Xe đã có lịch thuê trùng!";
@@ -780,7 +778,6 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
       return;
     }
 
-    // ⚠️ CHECK TRÙNG LỊCH KHI SỬA (bỏ qua chính hợp đồng đang sửa)
     if (checkOverlap(editingRental.vehicle_id, editingRental.start_date, editingRental.end_date, editingRental.id)) {
       notify("❌ Xe đã có lịch thuê trùng trong khoảng thời gian này!", "error");
       return;
@@ -922,7 +919,52 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
       )}
       
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile: Card View */}
+        <div className="block sm:hidden p-3 space-y-3">
+          {paginated.map((r: any) => {
+            const vehicle = vMap[r.vehicle_id];
+            const statusColor = r.status === "active" ? "orange" : r.status === "completed" ? "green" : "red";
+            const statusText = r.status === "active" ? "Thuê" : r.status === "completed" ? "Xong" : "Hủy";
+            
+            return (
+              <div key={r.id} className="border rounded-lg p-3 bg-gray-50">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1 min-w-0 mr-2">
+                    <p className="font-semibold text-sm truncate">{customerName(r.customer_id)}</p>
+                    <p className="text-xs text-gray-600 truncate">{vehicle?.name} • {vehicle?.plate}</p>
+                  </div>
+                  <Badge color={statusColor}>{statusText}</Badge>
+                </div>
+                
+                <div className="text-xs space-y-1 mb-3">
+                  <p className="text-gray-600">{formatDate(r.start_date)} → {formatDate(r.end_date)}</p>
+                  <p className="font-bold text-green-600 text-sm">{formatNumber(r.total)}đ</p>
+                  {r.surcharge > 0 && <p className="text-orange-500 text-xs">+{formatNumber(r.surcharge)}đ phụ thu</p>}
+                </div>
+
+                {r.status === "active" && canWrite("rentals") && (
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setEditingRental({ ...r, custom_total: "" })} 
+                      className="flex-1 bg-blue-100 text-blue-700 px-2 py-1.5 rounded text-xs hover:bg-blue-200 flex items-center justify-center gap-1"
+                    >
+                      <Edit className="w-3 h-3" />Sửa
+                    </button>
+                    <button 
+                      onClick={() => { setReturnModal(r); setReturnForm({ odo_end: String(r.odo_start), surcharge: "0", surcharge_note: "" }); }} 
+                      className="flex-1 bg-green-600 text-white px-2 py-1.5 rounded text-xs hover:bg-green-700 flex items-center justify-center gap-1"
+                    >
+                      <RotateCcw className="w-3 h-3" />Trả
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop: Table View */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
               <tr>
@@ -965,12 +1007,7 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
                         {r.status === "active" && canWrite("rentals") && (
                           <>
                             <button 
-                              onClick={() => {
-                                setEditingRental({
-                                  ...r,
-                                  custom_total: ""
-                                });
-                              }} 
+                              onClick={() => setEditingRental({ ...r, custom_total: "" })} 
                               className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs hover:bg-blue-200 flex items-center gap-1"
                             >
                               <Edit className="w-3 h-3" />Sửa
@@ -1127,100 +1164,99 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
       )}
 
       {/* Modal Trả Xe */}
-{returnModal && (
-  <Modal onClose={() => setReturnModal(null)} title="Trả xe">
-    <div className="space-y-3">
-      <div className="p-3 bg-blue-50 rounded-xl text-sm space-y-1">
-        <div className="flex justify-between">
-          <span className="text-gray-500">Xe:</span>
-          <span className="font-medium">{vehicleName(returnModal.vehicle_id)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Khách:</span>
-          <span className="font-medium">{customerName(returnModal.customer_id)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">ODO nhận:</span>
-          <span className="font-medium">{formatNumber(returnModal.odo_start)} km</span>
-        </div>
-        <div className="flex justify-between pt-2 border-t border-blue-200">
-          <span className="text-gray-500">Tổng hợp đồng:</span>
-          <span className="font-bold text-blue-600">{formatNumber(returnModal.total)}đ</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Đã cọc:</span>
-          <span className="font-bold text-green-600">-{formatNumber(returnModal.deposit)}đ</span>
-        </div>
-      </div>
-
-      <FormInput 
-        label={"ODO trả (≥ " + formatNumber(returnModal.odo_start) + " km)"} 
-        type="number" 
-        value={returnForm.odo_end} 
-        onChange={(v: string) => setReturnForm({ ...returnForm, odo_end: v })} 
-      />
-      
-      <FormInput 
-        label="Phụ thu (nếu có)" 
-        type="number" 
-        value={returnForm.surcharge} 
-        onChange={(v: string) => setReturnForm({ ...returnForm, surcharge: v })} 
-        placeholder="0"
-      />
-      
-      {parseInt(returnForm.surcharge) > 0 && (
-        <FormInput 
-          label="Lý do phụ thu" 
-          value={returnForm.surcharge_note} 
-          onChange={(v: string) => setReturnForm({ ...returnForm, surcharge_note: v })} 
-          placeholder="VD: Vệ sinh xe, trả trễ..."
-        />
-      )}
-
-      {/* TÍNH TOÁN TỰ ĐỘNG */}
-      <div className="p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl border-2 border-orange-300">
-        <h4 className="font-semibold text-sm mb-3 text-gray-700">💰 Tính toán thanh toán:</h4>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Tổng hợp đồng:</span>
-            <span className="font-medium">{formatNumber(returnModal.total)}đ</span>
-          </div>
-          <div className="flex justify-between text-green-600">
-            <span>Đã cọc:</span>
-            <span className="font-medium">-{formatNumber(returnModal.deposit)}đ</span>
-          </div>
-          {parseInt(returnForm.surcharge) > 0 && (
-            <div className="flex justify-between text-orange-600">
-              <span>Phụ thu:</span>
-              <span className="font-medium">+{formatNumber(parseInt(returnForm.surcharge))}đ</span>
+      {returnModal && (
+        <Modal onClose={() => setReturnModal(null)} title="Trả xe">
+          <div className="space-y-3">
+            <div className="p-3 bg-blue-50 rounded-xl text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Xe:</span>
+                <span className="font-medium">{vehicleName(returnModal.vehicle_id)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Khách:</span>
+                <span className="font-medium">{customerName(returnModal.customer_id)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">ODO nhận:</span>
+                <span className="font-medium">{formatNumber(returnModal.odo_start)} km</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-blue-200">
+                <span className="text-gray-500">Tổng hợp đồng:</span>
+                <span className="font-bold text-blue-600">{formatNumber(returnModal.total)}đ</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Đã cọc:</span>
+                <span className="font-bold text-green-600">-{formatNumber(returnModal.deposit)}đ</span>
+              </div>
             </div>
-          )}
-          <div className="flex justify-between pt-2 border-t-2 border-orange-300 text-lg">
-            <span className="font-bold">Còn phải thu:</span>
-            <span className="font-bold text-orange-600">
-              {formatNumber(returnModal.total - returnModal.deposit + (parseInt(returnForm.surcharge) || 0))}đ
-            </span>
-          </div>
-        </div>
-      </div>
 
-      <div className="flex gap-2">
-        <button 
-          onClick={doReturn} 
-          className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
-        >
-          <CheckCircle className="w-4 h-4" />Xác nhận trả xe
-        </button>
-        <button 
-          onClick={() => setReturnModal(null)} 
-          className="flex-1 bg-gray-200 py-2.5 rounded-xl"
-        >
-          Hủy
-        </button>
-      </div>
-    </div>
-  </Modal>
-)}
+            <FormInput 
+              label={"ODO trả (≥ " + formatNumber(returnModal.odo_start) + " km)"} 
+              type="number" 
+              value={returnForm.odo_end} 
+              onChange={(v: string) => setReturnForm({ ...returnForm, odo_end: v })} 
+            />
+            
+            <FormInput 
+              label="Phụ thu (nếu có)" 
+              type="number" 
+              value={returnForm.surcharge} 
+              onChange={(v: string) => setReturnForm({ ...returnForm, surcharge: v })} 
+              placeholder="0"
+            />
+            
+            {parseInt(returnForm.surcharge) > 0 && (
+              <FormInput 
+                label="Lý do phụ thu" 
+                value={returnForm.surcharge_note} 
+                onChange={(v: string) => setReturnForm({ ...returnForm, surcharge_note: v })} 
+                placeholder="VD: Vệ sinh xe, trả trễ..."
+              />
+            )}
+
+            <div className="p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl border-2 border-orange-300">
+              <h4 className="font-semibold text-sm mb-3 text-gray-700">💰 Tính toán thanh toán:</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tổng hợp đồng:</span>
+                  <span className="font-medium">{formatNumber(returnModal.total)}đ</span>
+                </div>
+                <div className="flex justify-between text-green-600">
+                  <span>Đã cọc:</span>
+                  <span className="font-medium">-{formatNumber(returnModal.deposit)}đ</span>
+                </div>
+                {parseInt(returnForm.surcharge) > 0 && (
+                  <div className="flex justify-between text-orange-600">
+                    <span>Phụ thu:</span>
+                    <span className="font-medium">+{formatNumber(parseInt(returnForm.surcharge))}đ</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-2 border-t-2 border-orange-300 text-lg">
+                  <span className="font-bold">Còn phải thu:</span>
+                  <span className="font-bold text-orange-600">
+                    {formatNumber(returnModal.total - returnModal.deposit + (parseInt(returnForm.surcharge) || 0))}đ
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button 
+                onClick={doReturn} 
+                className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-4 h-4" />Xác nhận trả xe
+              </button>
+              <button 
+                onClick={() => setReturnModal(null)} 
+                className="flex-1 bg-gray-200 py-2.5 rounded-xl"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
