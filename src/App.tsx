@@ -230,7 +230,6 @@ function Pagination({ page, total, onChange }: any) {
   );
 }
 
-// ===== TAB COMPONENTS =====
 function DashboardTab({ rentals, expenses, vehicles, customerName, vehicleName, dateRange, setDateRange }: any) {
   const activeRentals = rentals.filter((r: any) => r.status === "active");
   
@@ -246,8 +245,28 @@ function DashboardTab({ rentals, expenses, vehicles, customerName, vehicleName, 
   const totalExpenses = filteredExpenses.reduce((s: number, e: any) => s + e.amount, 0);
   const profit = revenue - totalExpenses;
 
+  // Thống kê từng xe
+  const vehicleStats = vehicles.map((vehicle: any) => {
+    const vehicleRentals = filteredRentals.filter((r: any) => r.vehicle_id === vehicle.id);
+    const vehicleExpenses = filteredExpenses.filter((e: any) => e.vehicle_id === vehicle.id);
+    
+    const vehicleRevenue = vehicleRentals.reduce((s: number, r: any) => s + r.paid, 0);
+    const vehicleExpense = vehicleExpenses.reduce((s: number, e: any) => s + e.amount, 0);
+    const vehicleProfit = vehicleRevenue - vehicleExpense;
+    const tripCount = vehicleRentals.length;
+
+    return {
+      ...vehicle,
+      revenue: vehicleRevenue,
+      expense: vehicleExpense,
+      profit: vehicleProfit,
+      tripCount
+    };
+  }).sort((a, b) => b.profit - a.profit); // Sắp xếp theo lợi nhuận cao nhất
+
   return (
     <div className="space-y-6">
+      {/* Date Filter */}
       <div className="flex flex-wrap gap-3 items-center">
         <FormInput 
           label="Từ ngày" 
@@ -271,6 +290,7 @@ function DashboardTab({ rentals, expenses, vehicles, customerName, vehicleName, 
         </button>
       </div>
 
+      {/* Tổng quan */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={DollarSign} label="Doanh thu" value={formatNumber(revenue) + "đ"} color="from-green-500 to-green-600" />
         <StatCard icon={TrendingUp} label="Chi phí" value={formatNumber(totalExpenses) + "đ"} color="from-red-500 to-red-600" />
@@ -278,6 +298,71 @@ function DashboardTab({ rentals, expenses, vehicles, customerName, vehicleName, 
         <StatCard icon={Car} label="Đang thuê" value={activeRentals.length} color="from-orange-500 to-orange-600" />
       </div>
 
+      {/* Thống kê từng xe */}
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <h3 className="font-bold mb-4 flex items-center gap-2 text-lg">
+          <Car className="w-5 h-5" />
+          Thống kê theo xe
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">Xe</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">Chuyến</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">Doanh thu</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">Chi phí</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">Lợi nhuận</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {vehicleStats.map((v: any) => (
+                <tr key={v.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{v.image}</span>
+                      <div>
+                        <p className="font-medium">{v.name}</p>
+                        <p className="text-xs text-gray-500">{v.plate}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium">{v.tripCount}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-green-600">
+                    {formatNumber(v.revenue)}đ
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-red-600">
+                    {formatNumber(v.expense)}đ
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-lg">
+                    <span className={v.profit >= 0 ? 'text-blue-600' : 'text-red-600'}>
+                      {formatNumber(v.profit)}đ
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <Badge color={v.status === "available" ? "green" : v.status === "rented" ? "orange" : "red"}>
+                      {v.status === "available" ? "✅ Sẵn" : v.status === "rented" ? "🔄 Thuê" : "🔧 Bảo trì"}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="bg-gray-50 font-bold">
+              <tr>
+                <td className="px-4 py-3">TỔNG CỘNG</td>
+                <td className="px-4 py-3 text-right">{filteredRentals.length}</td>
+                <td className="px-4 py-3 text-right text-green-600">{formatNumber(revenue)}đ</td>
+                <td className="px-4 py-3 text-right text-red-600">{formatNumber(totalExpenses)}đ</td>
+                <td className="px-4 py-3 text-right text-blue-600 text-lg">{formatNumber(profit)}đ</td>
+                <td className="px-4 py-3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* Hợp đồng đang hoạt động */}
       <div className="bg-white rounded-xl shadow-sm border p-6">
         <h3 className="font-bold mb-4 flex items-center gap-2">
           <Calendar className="w-5 h-5" />
