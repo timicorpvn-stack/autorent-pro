@@ -1570,8 +1570,38 @@ function ExpensesTab({ expenses, setExpenses, vehicles, notify, vMap, vehicleNam
       )}
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+  {/* Mobile: Card View */}
+  <div className="block sm:hidden p-3 space-y-3">
+    {paginated.map((e: any) => (
+      <div key={e.id} className="border rounded-lg p-3 bg-gray-50">
+        <div className="flex justify-between items-start mb-2">
+          <div className="flex-1 min-w-0 mr-2">
+            <p className="font-semibold text-sm truncate">{vehicleName(e.vehicle_id)}</p>
+            <p className="text-xs text-gray-600">{formatDate(e.date)}</p>
+          </div>
+          <Badge color="blue">{EXP_LABELS[e.type]}</Badge>
+        </div>
+        
+        <p className="text-xs text-gray-600 mb-2">{e.description || "—"}</p>
+        
+        <div className="flex justify-between items-center">
+          <p className="font-bold text-red-600 text-sm">{formatNumber(e.amount)}đ</p>
+          {canWrite("expenses") && (
+            <button 
+              onClick={() => deleteExpense(e.id)} 
+              className="text-red-600 hover:text-red-800 p-1"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    ))}
+  </div>
+
+  {/* Desktop: Table View */}
+  <div className="hidden sm:block overflow-x-auto">
+    <table className="w-full text-sm">
             <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
               <tr>
                 <th className="px-3 py-2.5 text-left">Ngày</th>
