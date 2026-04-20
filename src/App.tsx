@@ -1080,70 +1080,100 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
       )}
 
       {/* Modal Trả Xe */}
-      {returnModal && (
-        <Modal onClose={() => setReturnModal(null)} title="Trả xe">
-          <div className="space-y-3">
-            <div className="p-3 bg-blue-50 rounded-xl text-sm space-y-1">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Xe:</span>
-                <span>{vehicleName(returnModal.vehicle_id)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Khách:</span>
-                <span>{customerName(returnModal.customer_id)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">ODO nhận:</span>
-                <span>{formatNumber(returnModal.odo_start)} km</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Tổng:</span>
-                <span className="text-green-600 font-bold">{formatNumber(returnModal.total)}đ</span>
-              </div>
-            </div>
-            <FormInput 
-              label={"ODO trả ≥ " + formatNumber(returnModal.odo_start)} 
-              type="number" 
-              value={returnForm.odo_end} 
-              onChange={(v: string) => setReturnForm({ ...returnForm, odo_end: v })} 
-            />
-            <FormInput 
-              label="Phụ thu (đ)" 
-              type="number" 
-              value={returnForm.surcharge} 
-              onChange={(v: string) => setReturnForm({ ...returnForm, surcharge: v })} 
-            />
-            {parseInt(returnForm.surcharge) > 0 && (
-              <FormInput 
-                label="Lý do" 
-                value={returnForm.surcharge_note} 
-                onChange={(v: string) => setReturnForm({ ...returnForm, surcharge_note: v })} 
-              />
-            )}
-            <div className="p-3 bg-green-50 rounded-xl">
-              <p className="text-sm">
-                Tổng: <span className="text-xl font-bold text-green-600">
-                  {formatNumber(returnModal.total + (parseInt(returnForm.surcharge) || 0))}đ
-                </span>
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button 
-                onClick={doReturn} 
-                className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
-              >
-                <CheckCircle className="w-4 h-4" />Xác nhận
-              </button>
-              <button 
-                onClick={() => setReturnModal(null)} 
-                className="flex-1 bg-gray-200 py-2.5 rounded-xl"
-              >
-                Hủy
-              </button>
-            </div>
-          </div>
-        </Modal>
+{returnModal && (
+  <Modal onClose={() => setReturnModal(null)} title="Trả xe">
+    <div className="space-y-3">
+      <div className="p-3 bg-blue-50 rounded-xl text-sm space-y-1">
+        <div className="flex justify-between">
+          <span className="text-gray-500">Xe:</span>
+          <span className="font-medium">{vehicleName(returnModal.vehicle_id)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Khách:</span>
+          <span className="font-medium">{customerName(returnModal.customer_id)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">ODO nhận:</span>
+          <span className="font-medium">{formatNumber(returnModal.odo_start)} km</span>
+        </div>
+        <div className="flex justify-between pt-2 border-t border-blue-200">
+          <span className="text-gray-500">Tổng hợp đồng:</span>
+          <span className="font-bold text-blue-600">{formatNumber(returnModal.total)}đ</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Đã cọc:</span>
+          <span className="font-bold text-green-600">-{formatNumber(returnModal.deposit)}đ</span>
+        </div>
+      </div>
+
+      <FormInput 
+        label={"ODO trả (≥ " + formatNumber(returnModal.odo_start) + " km)"} 
+        type="number" 
+        value={returnForm.odo_end} 
+        onChange={(v: string) => setReturnForm({ ...returnForm, odo_end: v })} 
+      />
+      
+      <FormInput 
+        label="Phụ thu (nếu có)" 
+        type="number" 
+        value={returnForm.surcharge} 
+        onChange={(v: string) => setReturnForm({ ...returnForm, surcharge: v })} 
+        placeholder="0"
+      />
+      
+      {parseInt(returnForm.surcharge) > 0 && (
+        <FormInput 
+          label="Lý do phụ thu" 
+          value={returnForm.surcharge_note} 
+          onChange={(v: string) => setReturnForm({ ...returnForm, surcharge_note: v })} 
+          placeholder="VD: Vệ sinh xe, trả trễ..."
+        />
       )}
+
+      {/* TÍNH TOÁN TỰ ĐỘNG */}
+      <div className="p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl border-2 border-orange-300">
+        <h4 className="font-semibold text-sm mb-3 text-gray-700">💰 Tính toán thanh toán:</h4>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Tổng hợp đồng:</span>
+            <span className="font-medium">{formatNumber(returnModal.total)}đ</span>
+          </div>
+          <div className="flex justify-between text-green-600">
+            <span>Đã cọc:</span>
+            <span className="font-medium">-{formatNumber(returnModal.deposit)}đ</span>
+          </div>
+          {parseInt(returnForm.surcharge) > 0 && (
+            <div className="flex justify-between text-orange-600">
+              <span>Phụ thu:</span>
+              <span className="font-medium">+{formatNumber(parseInt(returnForm.surcharge))}đ</span>
+            </div>
+          )}
+          <div className="flex justify-between pt-2 border-t-2 border-orange-300 text-lg">
+            <span className="font-bold">Còn phải thu:</span>
+            <span className="font-bold text-orange-600">
+              {formatNumber(returnModal.total - returnModal.deposit + (parseInt(returnForm.surcharge) || 0))}đ
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button 
+          onClick={doReturn} 
+          className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
+        >
+          <CheckCircle className="w-4 h-4" />Xác nhận trả xe
+        </button>
+        <button 
+          onClick={() => setReturnModal(null)} 
+          className="flex-1 bg-gray-200 py-2.5 rounded-xl"
+        >
+          Hủy
+        </button>
+      </div>
+    </div>
+  </Modal>
+)}
     </div>
   );
 }
