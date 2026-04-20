@@ -1621,49 +1621,53 @@ function PublicBookingView({ vehicles, rentals }: any) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-      <header className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center gap-4">
-            <Car className="w-12 h-12" />
+      {/* Header - Mobile Optimized */}
+      <header className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-6 sm:py-12">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Car className="w-8 h-8 sm:w-12 sm:h-12 flex-shrink-0" />
             <div>
-              <h1 className="text-4xl font-bold mb-2">🚗 {contactName}</h1>
-              <p className="text-blue-100 text-lg">Chọn ngày trống để đặt xe ngay</p>
+              <h1 className="text-xl sm:text-4xl font-bold mb-1 sm:mb-2">🚗 {contactName}</h1>
+              <p className="text-blue-100 text-xs sm:text-lg">Chọn ngày trống để đặt xe</p>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-center gap-4 mb-8 bg-white rounded-xl shadow-lg p-4">
-          <button onClick={prevMonth} className="p-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition">
-            <ChevronLeft className="w-6 h-6" />
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        {/* Month Navigation - Mobile Optimized */}
+        <div className="flex items-center justify-center gap-2 sm:gap-4 mb-4 sm:mb-8 bg-white rounded-xl shadow-lg p-3 sm:p-4">
+          <button onClick={prevMonth} className="p-2 sm:p-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition">
+            <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6" />
           </button>
-          <h2 className="text-3xl font-bold text-gray-800">{monthName}</h2>
-          <button onClick={nextMonth} className="p-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition">
-            <ChevronRight className="w-6 h-6" />
+          <h2 className="text-lg sm:text-3xl font-bold text-gray-800">{monthName}</h2>
+          <button onClick={nextMonth} className="p-2 sm:p-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition">
+            <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6" />
           </button>
         </div>
 
-        <div className="space-y-8">
+        <div className="space-y-4 sm:space-y-8">
           {vehicles.filter((v: any) => v.status !== "maintenance").map((vehicle: any) => (
-            <div key={vehicle.id} className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition">
-              <div className="flex items-center justify-between mb-6 pb-6 border-b-2 border-gray-100">
-                <div className="flex items-center gap-4">
-                  <span className="text-6xl">{vehicle.image}</span>
+            <div key={vehicle.id} className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-3 sm:p-8 hover:shadow-2xl transition">
+              {/* Vehicle Header - Mobile Optimized */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 pb-4 sm:pb-6 border-b-2 border-gray-100 gap-3">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <span className="text-3xl sm:text-6xl">{vehicle.image}</span>
                   <div>
-                    <h3 className="text-3xl font-bold text-gray-800">{vehicle.name}</h3>
-                    <p className="text-gray-600 text-lg">{vehicle.plate} • {vehicle.type} • {vehicle.seats} chỗ</p>
+                    <h3 className="text-lg sm:text-3xl font-bold text-gray-800">{vehicle.name}</h3>
+                    <p className="text-xs sm:text-lg text-gray-600">{vehicle.plate} • {vehicle.seats} chỗ</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-600 mb-1">Giá từ</p>
-                  <p className="text-3xl font-bold text-blue-600">{formatNumber(vehicle.price_day)}đ/ngày</p>
+                <div className="text-left sm:text-right">
+                  <p className="text-xs sm:text-sm text-gray-600 mb-1">Giá từ</p>
+                  <p className="text-xl sm:text-3xl font-bold text-blue-600">{formatNumber(vehicle.price_day)}đ/ngày</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-7 gap-3">
+              {/* Calendar Grid - Mobile Optimized */}
+              <div className="grid grid-cols-7 gap-1 sm:gap-3">
                 {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map(day => (
-                  <div key={day} className="text-center font-bold text-gray-700 py-3 text-lg">
+                  <div key={day} className="text-center font-bold text-gray-700 py-1 sm:py-3 text-xs sm:text-lg">
                     {day}
                   </div>
                 ))}
@@ -1684,23 +1688,23 @@ function PublicBookingView({ vehicles, rentals }: any) {
                       key={date}
                       onClick={() => !isPast && vehicleStatus.status === 'available' && handleDateClick(vehicle, dateStr, vehicleStatus.status)}
                       disabled={vehicleStatus.status === 'rented' || isPast}
-                      className={`border-2 rounded-xl p-4 min-h-[110px] transition-all ${
-                        isToday ? 'border-blue-600 border-4' : 'border-gray-200'
+                      className={`border-2 rounded-lg sm:rounded-xl p-1 sm:p-4 min-h-[60px] sm:min-h-[110px] transition-all ${
+                        isToday ? 'border-blue-600 border-2 sm:border-4' : 'border-gray-200'
                       } ${
                         isPast ? 'bg-gray-100 cursor-not-allowed opacity-50' :
-                        vehicleStatus.status === 'available' ? 'bg-green-50 hover:bg-green-100 hover:scale-105 cursor-pointer shadow-md hover:shadow-xl' : 
+                        vehicleStatus.status === 'available' ? 'bg-green-50 hover:bg-green-100 active:scale-95 cursor-pointer shadow-sm hover:shadow-xl' : 
                         'bg-red-50 cursor-not-allowed'
                       }`}
                     >
-                      <p className="text-2xl font-bold mb-2 text-gray-800">{date}</p>
-                      <p className={`text-sm font-bold ${
+                      <p className="text-sm sm:text-2xl font-bold mb-0 sm:mb-2 text-gray-800">{date}</p>
+                      <p className={`text-[8px] sm:text-sm font-bold ${
                         isPast ? 'text-gray-500' :
                         vehicleStatus.status === 'available' ? 'text-green-700' : 'text-red-700'
                       }`}>
-                        {isPast ? '⏮️ Qua' : vehicleStatus.status === 'available' ? '✅ Trống' : '🔄 Thuê'}
+                        {isPast ? '⏮️' : vehicleStatus.status === 'available' ? '✅' : '🔄'}
                       </p>
                       {vehicleStatus.time && !isPast && (
-                        <p className="text-xs text-orange-600 font-bold mt-1">
+                        <p className="text-[8px] sm:text-xs text-orange-600 font-bold mt-0 sm:mt-1">
                           {vehicleStatus.time}
                         </p>
                       )}
@@ -1709,19 +1713,20 @@ function PublicBookingView({ vehicles, rentals }: any) {
                 })}
               </div>
 
-              <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border-2 border-blue-200">
-                <div className="grid grid-cols-3 gap-4 text-center">
+              {/* Price Info - Mobile Optimized */}
+              <div className="mt-3 sm:mt-6 p-2 sm:p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg sm:rounded-xl border-2 border-blue-200">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
                   <div>
-                    <p className="text-sm text-gray-600">Giá/ngày</p>
-                    <p className="text-xl font-bold text-blue-600">{formatNumber(vehicle.price_day)}đ</p>
+                    <p className="text-[10px] sm:text-sm text-gray-600">Giá/ngày</p>
+                    <p className="text-sm sm:text-xl font-bold text-blue-600">{formatNumber(vehicle.price_day)}đ</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Giá/tuần</p>
-                    <p className="text-xl font-bold text-green-600">{formatNumber(vehicle.price_week)}đ</p>
+                    <p className="text-[10px] sm:text-sm text-gray-600">Giá/tuần</p>
+                    <p className="text-sm sm:text-xl font-bold text-green-600">{formatNumber(vehicle.price_week)}đ</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Giá/tháng</p>
-                    <p className="text-xl font-bold text-purple-600">{formatNumber(vehicle.price_month)}đ</p>
+                    <p className="text-[10px] sm:text-sm text-gray-600">Giá/tháng</p>
+                    <p className="text-sm sm:text-xl font-bold text-purple-600">{formatNumber(vehicle.price_month)}đ</p>
                   </div>
                 </div>
               </div>
@@ -1730,10 +1735,11 @@ function PublicBookingView({ vehicles, rentals }: any) {
         </div>
       </main>
 
-      <footer className="bg-gray-800 text-white py-8 mt-16">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-lg font-semibold mb-2">🚗 {contactName} - Cho thuê xe uy tín</p>
-          <p className="text-gray-400">Liên hệ: {contactPhone}</p>
+      {/* Footer - Mobile Optimized */}
+      <footer className="bg-gray-800 text-white py-4 sm:py-8 mt-8 sm:mt-16">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 text-center">
+          <p className="text-sm sm:text-lg font-semibold mb-1 sm:mb-2">🚗 {contactName}</p>
+          <p className="text-xs sm:text-base text-gray-400">📞 {contactPhone}</p>
         </div>
       </footer>
     </div>
