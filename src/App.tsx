@@ -1747,34 +1747,49 @@ export default function App() {
       notify("❌ Nhập đầy đủ!", "error"); return;
     }
     setLoading(true);
-    const hash = await hashPassword(password);
-    const { data, error } = await supabase.from('users')
-      .select('*').eq('username', username.toLowerCase())
-      .eq('password_hash', hash).eq('is_active', true).single();
-    
-    if (error || !data) {
-      notify("❌ Sai thông tin đăng nhập hoặc tài khoản bị khóa!", "error");
+    try {
+      const hash = await hashPassword(password);
+      
+      const { data: usersList, error } = await supabase
+        .rpc('check_login', {
+          p_username: username.toLowerCase(),
+          p_password_hash: hash
+        });
+      
+      if (error) {
+        console.error('Login error:', error);
+        notify("❌ Lỗi kết nối: " + error.message, "error");
+        setLoading(false);
+        return;
+      }
+      
+      if (!usersList || usersList.length === 0) {
+        notify("❌ Sai tên đăng nhập hoặc mật khẩu!", "error");
+        setLoading(false);
+        return;
+      }
+      
+      const userData = usersList[0];
+      
+      supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', userData.id).then(() => {});
+      
+      logActivity(userData.id, userData.username, "Đăng nhập", "");
+      
+      localStorage.setItem("autorent_session", JSON.stringify({
+        user: userData,
+        timestamp: Date.now()
+      }));
+      
+      setUser(userData);
+      setUsername("");
+      setPassword("");
       setLoading(false);
-      return;
+      notify(`✅ Xin chào ${userData.name}!`);
+    } catch (err: any) {
+      console.error('Login exception:', err);
+      notify("❌ Lỗi: " + err.message, "error");
+      setLoading(false);
     }
-
-    // Update last_login
-    supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', data.id).then(() => {});
-    
-    // Log activity
-    logActivity(data.id, data.username, "Đăng nhập", "");
-
-    // Save session
-    localStorage.setItem("autorent_session", JSON.stringify({
-      user: data,
-      timestamp: Date.now()
-    }));
-    
-    setUser(data);
-    setUsername("");
-    setPassword("");
-    setLoading(false);
-    notify(`✅ Xin chào ${data.name}!`);
   };
 
   const logout = () => {
