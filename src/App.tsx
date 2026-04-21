@@ -614,7 +614,7 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
     if (Object.keys(e).length) return;
 
     const days = Math.ceil((new Date(form.end_date).getTime() - new Date(form.start_date).getTime()) / 86400000);
-    const basePrice = calculatePrice();
+    const basePrice = calculatePrice(form);
     const finalPrice = parseInt(form.custom_price) || basePrice;
     const deposit = Math.min(parseInt(form.deposit) || 0, finalPrice);
 
@@ -632,7 +632,6 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
     dbInsert('rentals', newRental, (saved: any) => {
       if (saved) {
         setRentals((prev: any) => [saved, ...prev]);
-        // Chỉ update status nếu bắt đầu ngay hôm nay
         if (form.start_date <= today) {
           dbUpdate('vehicles', v.id, { status: "rented" }, () => {
             setVehicles((prev: any) => prev.map((x: any) => x.id === v.id ? { ...x, status: "rented" } : x));
