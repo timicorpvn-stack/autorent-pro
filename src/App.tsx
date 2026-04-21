@@ -584,8 +584,8 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
   const [returnForm, setReturnForm] = useState<any>({ odo_end: "", surcharge: "0", surcharge_note: "" });
   const [errors, setErrors] = useState<any>({});
   
-  const calculatePrice = (f: any = form) => {
-    if (!f.vehicle_id || !f.start_date || !f.end_date) return 0;
+  const calculatePrice = (f: any) => {
+    if (!f || !f.vehicle_id || !f.start_date || !f.end_date) return 0;
     const vehicle = vMap[f.vehicle_id];
     if (!vehicle) return 0;
     const days = Math.ceil((new Date(f.end_date).getTime() - new Date(f.start_date).getTime()) / 86400000);
@@ -711,8 +711,8 @@ function RentalsTab({ rentals, vehicles, setVehicles, setRentals, customers, che
     });
   };
 
-  const basePrice = calculatePrice();
-  const editBasePrice = calculatePrice(editingRental);
+  const basePrice = calculatePrice(form);
+  const editBasePrice = editingRental ? calculatePrice(editingRental) : 0;
   
   const filtered = rentals.filter((r: any) => {
     if (!search) return true;
